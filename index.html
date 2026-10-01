@@ -125,12 +125,22 @@ input[type=date]{font:600 17px var(--f);padding:6px 10px;border:1.5px solid var(
 <dialog id="dlg"><p id="dlgMsg"></p><div class="btns" style="margin:0;justify-content:flex-end"><button class="btn ghost" id="dlgNo">取消</button><button class="btn" id="dlgYes" style="background:var(--red)">確定</button></div></dialog>
 <script>
 const KEY='family-bowling-v1';
-const DEFAULT=['軍','靖','WD瀧','Yu','阿娟','見雄','俊儀','開庭','宏進','川平','川豪','紀庭'];
+const DEFAULT=['軍','靖','WD瀧','Yu','阿娟','見雄','俊儀','開庭','宏進','川平','川豪','紀婷'];
 const today=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};
 const fresh=()=>({date:today(),bingo:['','','',''],bingoHcp:false,roster:[...DEFAULT],present:{},hcp:{},indiv:{},useHcpIndiv:true,games:[],cur:{pairs:[],solo:{},scores:{},pick:null},tab:'setup'});
 let S;
 try{S=JSON.parse(localStorage.getItem(KEY))||fresh()}catch(e){S=fresh()}
 S=Object.assign(fresh(),S);
+(function rename(o,n){ // 舊紀錄改名
+  if(!S.roster.includes(o))return;
+  S.roster=S.roster.map(x=>x===o?n:x);
+  ['present','hcp','indiv'].forEach(k=>{if(o in S[k]){S[k][n]=S[k][o];delete S[k][o]}});
+  const mv=m=>{if(m&&o in m){m[n]=m[o];delete m[o]}};
+  S.games.forEach(g=>{mv(g.teams);mv(g.scores);mv(g.indiv)});
+  mv(S.cur.scores);mv(S.cur.solo);
+  S.cur.pairs.forEach(p=>{for(let i=0;i<3;i++)if(p[i]===o)p[i]=n});
+  if(S.cur.pick===o)S.cur.pick=n;
+})('紀庭','紀婷');
 function ask(msg,yes){const d=document.getElementById('dlg');document.getElementById('dlgMsg').textContent=msg;
   document.getElementById('dlgYes').onclick=()=>{d.close();yes()};document.getElementById('dlgNo').onclick=()=>d.close();
   if(d.showModal)d.showModal();else if(window.confirm(msg))yes();}
