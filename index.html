@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>家族保齡球計分</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#E9F1EC; --card:#F7FBF8; --ink:#1B2A4A; --muted:#5B6B80; --line:#C6D6CD;
+  --red:#C8283C; --redsoft:#F6DCE0; --gold:#D99A1E; --goldsoft:#FBEBC8; --lane:#2E5E8C; --lanesoft:#DCE7F2;
+  --f:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+  --num:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --paper:#141C2B; --card:#1D2739; --ink:#E6ECF5; --muted:#9AA8BC; --line:#2F3C53;
+  --red:#F06A7B; --redsoft:#3C2129; --gold:#F2B940; --goldsoft:#3A2F17; --lane:#7FB0E0; --lanesoft:#1F3149;}}
+:root[data-theme="dark"]{
+  --paper:#141C2B; --card:#1D2739; --ink:#E6ECF5; --muted:#9AA8BC; --line:#2F3C53;
+  --red:#F06A7B; --redsoft:#3C2129; --gold:#F2B940; --goldsoft:#3A2F17; --lane:#7FB0E0; --lanesoft:#1F3149;}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--f);font-size:16px;line-height:1.55}
+.wrap{max-width:680px;margin:0 auto;padding:0 14px 90px}
+header{padding:22px 2px 10px;display:flex;align-items:flex-end;justify-content:space-between;gap:10px}
+h1{margin:0;font-size:26px;font-weight:900;letter-spacing:.02em}
+h1 small{display:block;font-size:13px;font-weight:500;color:var(--muted);letter-spacing:0}
+.pins{font-family:var(--num);font-size:15px;color:var(--muted);text-align:right}
+nav{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--paper);display:flex;gap:6px;padding:8px 0 10px;border-bottom:2px solid var(--ink)}
+nav button{flex:1;border:0;background:transparent;font:700 16px var(--f);color:var(--muted);padding:9px 4px;border-radius:8px;cursor:pointer}
+nav button.on{background:var(--ink);color:var(--paper)}
+h2{font-size:18px;margin:22px 0 4px}
+.hint{color:var(--muted);font-size:14px;margin:0 0 10px}
+.box{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:1.5px solid var(--line);background:var(--card);color:var(--ink);font:500 16px var(--f);padding:7px 13px;border-radius:999px;cursor:pointer;min-height:40px}
+.chip.on{border-color:var(--ink);background:var(--ink);color:var(--paper)}
+.chip.sel{border-color:var(--gold);background:var(--goldsoft);color:var(--ink);box-shadow:0 0 0 2px var(--gold)}
+.row{display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:center;padding:9px 2px;border-bottom:1px dashed var(--line)}
+.row:last-child{border-bottom:0}
+.nm{font-weight:700}
+label.sm{font-size:13px;color:var(--muted);display:flex;align-items:center;gap:6px}
+input[type=number],input[type=text]{font:600 18px var(--num);width:66px;padding:6px 8px;border:1.5px solid var(--line);border-radius:8px;background:var(--paper);color:var(--ink);text-align:center}
+input[type=text]{font:500 16px var(--f);width:auto;flex:1;text-align:left}
+input:focus-visible,button:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+.tog{appearance:none;width:44px;height:26px;border-radius:13px;background:var(--line);position:relative;cursor:pointer;margin:0;flex:none}
+.tog::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:var(--card);transition:left .15s}
+.tog:checked{background:var(--gold)}.tog:checked::after{left:21px}
+.btn{border:0;border-radius:10px;padding:11px 16px;font:700 16px var(--f);cursor:pointer;background:var(--ink);color:var(--paper)}
+.btn.ghost{background:transparent;color:var(--ink);border:1.5px solid var(--line)}
+.btn.warn{background:transparent;color:var(--red);border:1.5px solid var(--red)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.pair{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px dashed var(--line)}
+.pair:last-child{border-bottom:0}
+.pair .vs{font:700 14px var(--num);color:var(--muted)}
+.pair .who{flex:1;border:1.5px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;padding:8px;font:700 16px var(--f);cursor:pointer;min-height:44px}
+.pair .who.win{background:var(--goldsoft);border-color:var(--gold)}
+.pair .who.lose{color:var(--muted)}
+.x{border:0;background:none;color:var(--muted);font-size:22px;cursor:pointer;padding:4px 8px}
+.seg{display:inline-flex;border:1.5px solid var(--line);border-radius:10px;overflow:hidden}
+.seg button{border:0;background:var(--card);color:var(--ink);font:700 14px var(--f);padding:8px 12px;cursor:pointer}
+.seg button.on{background:var(--ink);color:var(--paper)}
+.teams{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.team{border-radius:12px;padding:10px 12px;border:1.5px solid var(--line);background:var(--card)}
+.team h3{margin:0 0 4px;font-size:15px}
+.team .tot{font:700 40px/1 var(--num)}
+.team.lead{border-color:var(--gold);background:var(--goldsoft)}
+.team .mem{font-size:14px;color:var(--muted)}
+.tag{display:inline-block;font-size:12px;font-weight:700;padding:1px 7px;border-radius:6px;margin-left:6px;vertical-align:2px}
+.tag.A{background:var(--lanesoft);color:var(--lane)}.tag.B{background:var(--redsoft);color:var(--red)}
+.tag.b{background:var(--goldsoft);color:var(--gold)}
+.bingo{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.bingo input{width:100%}
+#imgOut img{width:100%;border-radius:10px;border:1px solid var(--line);display:block;margin-top:10px;-webkit-touch-callout:default}
+.tag.i{background:var(--goldsoft);color:var(--gold)}
+.score{border-bottom:1px dashed var(--line);padding:10px 2px}
+.score:last-child{border-bottom:0}
+.score .top{display:flex;justify-content:space-between;align-items:baseline}
+.score .fields{display:flex;gap:12px;flex-wrap:wrap;margin-top:6px}
+.adj{font:700 22px var(--num)}
+.money{font:700 18px var(--num);white-space:nowrap}
+.pos{color:var(--lane)}.neg{color:var(--red)}.zero{color:var(--muted)}
+table{width:100%;border-collapse:collapse;font-size:15px}
+th,td{padding:8px 6px;text-align:right;border-bottom:1px solid var(--line)}
+th:first-child,td:first-child{text-align:left}
+th{font-size:13px;color:var(--muted);font-weight:500}
+td.money{font-size:17px}
+tfoot td{border-bottom:0;font-weight:700}
+.scroll{overflow-x:auto}
+.game{margin-top:10px}
+.game summary{cursor:pointer;font-weight:700;list-style:none;display:flex;justify-content:space-between;gap:8px}
+.game summary::-webkit-details-marker{display:none}
+.empty{padding:22px 10px;text-align:center;color:var(--muted)}
+.stick{position:fixed;left:0;right:0;bottom:0;background:var(--paper);border-top:2px solid var(--ink);padding:10px 14px calc(10px + env(safe-area-inset-bottom,0px));z-index:6}
+.stick .in{max-width:680px;margin:0 auto;display:flex;gap:10px;align-items:center}
+.stick .msg{flex:1;font-size:14px;color:var(--muted)}
+.hide{display:none!important}
+dialog{border:0;border-radius:14px;padding:18px;background:var(--card);color:var(--ink);max-width:340px;width:calc(100% - 40px)}
+dialog::backdrop{background:rgba(10,15,25,.55)}
+dialog p{margin:0 0 14px;font-size:17px;font-weight:700}
+.line{background:#06C755;color:#fff;text-decoration:none;display:inline-flex;align-items:center}
+textarea{width:100%;min-height:160px;font:14px var(--f);padding:10px;border:1.5px solid var(--line);border-radius:8px;background:var(--paper);color:var(--ink)}
+input[type=date]{font:600 17px var(--f);padding:6px 10px;border:1.5px solid var(--line);border-radius:8px;background:var(--paper);color:var(--ink)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>家族保齡球<small>團體賽＋個人賽計分</small></h1>
+    <div class="pins" id="gcount"></div>
+  </header>
+  <nav>
+    <button data-tab="setup">設定</button>
+    <button data-tab="game">本局</button>
+    <button data-tab="bill">結算</button>
+  </nav>
+  <main id="main"></main>
+</div>
+<div class="stick hide" id="stick"><div class="in"><div class="msg" id="stickMsg"></div><button class="btn" id="saveBtn" data-act="save">儲存本局</button></div></div>
+
+<dialog id="dlg"><p id="dlgMsg"></p><div class="btns" style="margin:0;justify-content:flex-end"><button class="btn ghost" id="dlgNo">取消</button><button class="btn" id="dlgYes" style="background:var(--red)">確定</button></div></dialog>
+<script>
+const KEY='family-bowling-v1';
+const DEFAULT=['軍','靖','WD瀧','Yu','阿娟','見雄','俊儀','開庭','宏進','川平','川豪','紀庭'];
+const today=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};
+const fresh=()=>({date:today(),bingo:['','','',''],bingoHcp:false,roster:[...DEFAULT],present:{},hcp:{},indiv:{},useHcpIndiv:true,games:[],cur:{pairs:[],solo:{},scores:{},pick:null},tab:'setup'});
+let S;
+try{S=JSON.parse(localStorage.getItem(KEY))||fresh()}catch(e){S=fresh()}
+S=Object.assign(fresh(),S);
+function ask(msg,yes){const d=document.getElementById('dlg');document.getElementById('dlgMsg').textContent=msg;
+  document.getElementById('dlgYes').onclick=()=>{d.close();yes()};document.getElementById('dlgNo').onclick=()=>d.close();
+  if(d.showModal)d.showModal();else if(window.confirm(msg))yes();}
+const fmtDate=s=>s?s.replace(/-/g,'/'):'';
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const present=()=>S.roster.filter(n=>S.present[n]);
+const money=n=>{n=Math.round(n);return n>0?`<span class="money pos">+$${n}</span>`:n<0?`<span class="money neg">−$${-n}</span>`:`<span class="money zero">$0</span>`};
+const TEAM={A:'甲隊',B:'乙隊'};
+
+/* ---------- team assignment from pairs ---------- */
+function teamsOf(){
+  const t={};
+  S.cur.pairs.forEach(p=>{ if(p[2]){t[p[2]]='A';t[p[0]===p[2]?p[1]:p[0]]='B';} });
+  Object.entries(S.cur.solo).forEach(([n,v])=>{ if(S.present[n]&&!inPair(n)) t[n]=v; });
+  return t;
+}
+const inPair=n=>S.cur.pairs.some(p=>p[0]===n||p[1]===n);
+function cleanCur(){
+  S.cur.pairs=S.cur.pairs.filter(p=>S.present[p[0]]&&S.present[p[1]]);
+  if(S.cur.pick&&!S.present[S.cur.pick])S.cur.pick=null;
+}
+
+/* ---------- money computation for one game ---------- */
+function compute(g){
+  const names=Object.keys(g.teams), d={};
+  names.forEach(n=>d[n]={team:0,indiv:0,turkey:0});
+  const sc=n=>g.scores[n]||{};
+  const raw=n=>+sc(n).s||0, adj=n=>raw(n)+(+sc(n).h||0);
+  let A=0,B=0; names.forEach(n=>g.teams[n]==='A'?A+=adj(n):B+=adj(n));
+  const loser=A>B?'B':B>A?'A':null;
+  if(loser) names.forEach(n=>{if(g.teams[n]===loser)d[n].team=-200});
+  const bingo={}, bl=(g.bingo||[]).filter(v=>v!==''&&v!=null).map(Number);
+  if(loser&&bl.length&&names.length>=2){
+    const th=names.map(raw).sort((a,b)=>a-b)[1];
+    names.forEach(n=>{ if(raw(n)<=th){ const v=g.bingoHcp?adj(n):raw(n);
+      if(bl.includes(v)){ bingo[n]=true; if(g.teams[n]===loser) d[n].team=-100; } } });
+  }
+  const P=names.filter(n=>g.indiv[n]); const val=n=>g.useHcp?adj(n):raw(n);
+  const place={};
+  if(P.length>=2){
+    const vals=[...new Set(P.map(val))].sort((a,b)=>b-a);
+    const win=P.filter(n=>val(n)===vals[0]);
+    let exempt=[];
+    if(P.length>=5&&win.length===1&&vals.length>1) exempt=P.filter(n=>val(n)===vals[1]);
+    const lose=P.filter(n=>!win.includes(n)&&!exempt.includes(n));
+    lose.forEach(n=>{d[n].indiv=-100;place[n]='輸'});
+    exempt.forEach(n=>place[n]='第二');
+    win.forEach(n=>{d[n].indiv=lose.length*100/win.length;place[n]=lose.length?'贏':'平'});
+    P.forEach(n=>{const k=+sc(n).t||0; if(k>=3){const amt=(k-2)*20; P.forEach(o=>{if(o!==n){d[o].turkey-=amt;d[n].turkey+=amt}})}});
+  }
+  return {A,B,loser,d,P,place,adj,val,bingo};
+}
+function curGame(){
+  const teams=teamsOf(), scores={}, indiv={};
+  Object.keys(teams).forEach(n=>{scores[n]=S.cur.scores[n]||{s:'',h:S.hcp[n]||0,t:0}; if(S.indiv[n])indiv[n]=true});
+  return {teams,scores,indiv,useHcp:S.useHcpIndiv,bingo:S.bingo.filter(v=>v!==''),bingoHcp:S.bingoHcp};
+}
+
+/* ---------- views ---------- */
+function vSetup(){
+  const p=present();
+  return `
+  <h2>比賽日期</h2>
+  <input type="date" data-in="date" value="${esc(S.date||'')}">
+  <h2>今天誰有來？</h2>
+  <p class="hint">點名字選出席的人。</p>
+  <div class="chips">${S.roster.map(n=>`<button class="chip ${S.present[n]?'on':''}" data-act="present" data-n="${esc(n)}">${esc(n)}</button>`).join('')}</div>
+  <div class="btns" style="margin-top:10px">
+    <input type="text" id="newName" placeholder="新增人名" maxlength="8"><button class="btn ghost" data-act="add">新增</button>
+  </div>
+  <h2>讓分與個人賽</h2>
+  <p class="hint">讓分會自動帶入每一局，打完輸入分數時也能再改。</p>
+  <div class="box">${p.length?p.map(n=>`
+    <div class="row"><span class="nm">${esc(n)}</span>
+      <label class="sm">讓分 <input type="number" inputmode="numeric" data-in="hcp" data-n="${esc(n)}" value="${S.hcp[n]||0}"></label>
+      <label class="sm">個人賽 <input type="checkbox" class="tog" data-in="indiv" data-n="${esc(n)}" ${S.indiv[n]?'checked':''}></label>
+    </div>`).join(''):`<div class="empty">先在上面點選出席的人</div>`}
+  </div>
+  <div class="box" style="margin-top:10px">
+    <div class="row" style="grid-template-columns:1fr auto"><span>個人賽排名要加讓分</span><input type="checkbox" class="tog" data-in="useHcp" ${S.useHcpIndiv?'checked':''}></div>
+  </div>
+  <h2>賓果數字</h2>
+  <p class="hint">最多 4 組。每局分數最低的兩人，分數剛好等於其中一個數字，團體賽輸了只要付 $100。不玩就留空。</p>
+  <div class="box">
+    <div class="bingo">${S.bingo.map((v,i)=>`<input type="number" inputmode="numeric" placeholder="—" aria-label="賓果數字 ${i+1}" data-in="bingo" data-i="${i}" value="${esc(v)}">`).join('')}</div>
+    <div class="row" style="grid-template-columns:1fr auto;margin-top:6px"><span>賓果比對要加讓分</span><input type="checkbox" class="tog" data-in="bingoHcp" ${S.bingoHcp?'checked':''}></div>
+  </div>
+  <div class="btns"><button class="btn" data-act="tab" data-t="game" ${p.length<2?'disabled':''}>開始分組</button></div>
+  <h2>重新開始</h2>
+  <p class="hint">清掉所有局數紀錄，日期改回今天，出席名單和讓分會保留。</p>
+  <button class="btn warn" data-act="reset">清空所有局數</button>`;
+}
+function vGame(){
+  cleanCur();
+  const p=present(); if(p.length<2) return `<div class="empty">先到「設定」選至少兩位出席的人</div>`;
+  const free=p.filter(n=>!inPair(n));
+  const t=teamsOf(); const ready=p.every(n=>t[n]);
+  let h=`<h2>第 ${S.games.length+1} 局：猜拳分組</h2>
+  <p class="hint">依序點兩個人配成一對猜拳，再點贏的那位。猜拳贏的進甲隊、輸的進乙隊。</p>
+  <div class="chips">${free.map(n=>`<button class="chip ${S.cur.pick===n?'sel':''}" data-act="pick" data-n="${esc(n)}">${esc(n)}</button>`).join('')||'<span class="hint">全員都配好了</span>'}</div>
+  <div class="box" style="margin-top:10px">${S.cur.pairs.length?S.cur.pairs.map((pr,i)=>`
+    <div class="pair">
+      <button class="who ${pr[2]===pr[0]?'win':pr[2]?'lose':''}" data-act="win" data-i="${i}" data-n="${esc(pr[0])}">${pr[2]===pr[0]?'✊ ':''}${esc(pr[0])}</button>
+      <span class="vs">VS</span>
+      <button class="who ${pr[2]===pr[1]?'win':pr[2]?'lose':''}" data-act="win" data-i="${i}" data-n="${esc(pr[1])}">${pr[2]===pr[1]?'✊ ':''}${esc(pr[1])}</button>
+      <button class="x" aria-label="拆開這組" data-act="unpair" data-i="${i}">×</button>
+    </div>`).join(''):'<div class="empty" style="padding:10px">還沒有配對</div>'}
+    ${free.length===1?`<div class="pair"><span class="nm" style="flex:1">${esc(free[0])}（落單）</span>
+      <span class="seg"><button class="${S.cur.solo[free[0]]==='A'?'on':''}" data-act="solo" data-n="${esc(free[0])}" data-v="A">甲隊</button><button class="${S.cur.solo[free[0]]==='B'?'on':''}" data-act="solo" data-n="${esc(free[0])}" data-v="B">乙隊</button></span></div>`:''}
+  </div>
+  <div class="btns"><button class="btn ghost" data-act="random">幫我隨機猜拳</button><button class="btn ghost" data-act="clearpairs">重新分組</button></div>`;
+  if(!ready){ return h+`<p class="hint" style="margin-top:14px">每個人都分好隊後，下面會出現輸入分數。</p>`; }
+  const g=curGame(), r=compute(g);
+  const mem=k=>p.filter(n=>t[n]===k).map(esc).join('、');
+  h+=`<h2>比分</h2>
+  <div class="teams" id="teamBox">${teamCards(r,mem)}</div>
+  <h2>輸入分數</h2>
+  <p class="hint">分數是實際打的分，讓分會加上去計算。火雞填「最長連續全倒數」，3 以上才算。${g.bingo.length?`<br>賓果數字：${g.bingo.map(esc).join('、')}（最低兩名${g.bingoHcp?'加讓分後':''}打中，輸了只付 $100）`:''}</p>
+  <div class="box">${p.map(n=>{const s=g.scores[n];return `
+    <div class="score">
+      <div class="top"><span class="nm">${esc(n)}<span class="tag ${t[n]}">${TEAM[t[n]]}</span>${g.indiv[n]?'<span class="tag i">個人賽</span>':''}<span class="tag b ${r.bingo[n]?'':'hide'}" data-bingo="${esc(n)}">🎯 賓果</span></span>
+        <span><span class="adj" data-adj="${esc(n)}">${r.adj(n)}</span> <span data-mon="${esc(n)}">${money(sumD(r.d[n]))}</span></span></div>
+      <div class="fields">
+        <label class="sm">分數 <input type="number" inputmode="numeric" min="0" max="300" data-in="s" data-n="${esc(n)}" value="${esc(s.s)}"></label>
+        <label class="sm">讓分 <input type="number" inputmode="numeric" data-in="h" data-n="${esc(n)}" value="${esc(s.h)}"></label>
+        ${g.indiv[n]?`<label class="sm">火雞 <input type="number" inputmode="numeric" min="0" max="12" data-in="t" data-n="${esc(n)}" value="${esc(s.t||0)}"></label>`:''}
+      </div>
+    </div>`}).join('')}</div>`;
+  return h;
+}
+const sumD=x=>x.team+x.indiv+x.turkey;
+function teamCards(r,mem){
+  return ['A','B'].map(k=>`<div class="team ${r.loser&&r.loser!==k?'lead':''}"><h3>${TEAM[k]}</h3><div class="tot">${k==='A'?r.A:r.B}</div><div class="mem">${mem(k)}</div></div>`).join('');
+}
+function vBill(){
+  if(!S.games.length) return `<div class="empty">${fmtDate(S.date)}<br>還沒有儲存任何一局。打完第一局後在「本局」按儲存。</div>`;
+  const tot=totals();
+  const rows=Object.entries(tot).sort((a,b)=>sumD(a[1])-sumD(b[1]));
+  const col=k=>rows.reduce((s,[,x])=>s+x[k],0);
+  let h=`<div class="btns"><button class="btn" data-act="next">下一局（第 ${S.games.length+1} 局）</button></div>
+  <h2>${fmtDate(S.date)}　共 ${S.games.length} 局，每人要付</h2>
+  <p class="hint">負數是要付出去的錢，正數是可以收的錢。</p>
+  <div class="box scroll"><table>
+    <thead><tr><th>人</th><th>團體賽</th><th>個人賽</th><th>火雞</th><th>合計</th></tr></thead>
+    <tbody>${rows.map(([n,x])=>`<tr><td class="nm">${esc(n)}</td><td>${money(x.team)}</td><td>${money(x.indiv)}</td><td>${money(x.turkey)}</td><td class="money">${money(sumD(x))}</td></tr>`).join('')}</tbody>
+    <tfoot><tr><td>總計</td><td>${money(col('team'))}</td><td>${money(col('indiv'))}</td><td>${money(col('turkey'))}</td><td></td></tr></tfoot>
+  </table></div>
+  <h2>分享結果</h2>
+  <div class="btns" style="margin-top:4px"><button class="btn" data-act="img">產生結算圖片</button></div>
+  <div id="imgOut"></div>
+  <div class="btns"><a class="btn ghost" href="https://line.me/R/share?text=${encodeURIComponent(exportText())}" target="_blank" rel="noopener">傳文字到 LINE</a><button class="btn ghost" data-act="copy">複製文字</button></div>
+  <textarea id="exp" readonly class="hide" aria-label="結算文字">${esc(exportText())}</textarea>
+  <h2>各局紀錄</h2>`;
+  h+=S.games.map((g,i)=>{const r=compute(g);const ns=Object.keys(g.teams);
+    return `<details class="box game"><summary><span>第 ${i+1} 局</span><span>甲 ${r.A} : ${r.B} 乙　${r.loser?TEAM[r.loser==='A'?'B':'A']+'勝':'平手'}</span></summary>
+    <div class="scroll"><table style="margin-top:8px"><thead><tr><th>人</th><th>隊</th><th>分數</th><th>讓</th><th>火雞</th><th>個人</th><th>本局</th></tr></thead><tbody>
+    ${ns.map(n=>{const s=g.scores[n];return `<tr><td>${esc(n)}</td><td><span class="tag ${g.teams[n]}" style="margin:0">${TEAM[g.teams[n]]}</span></td><td>${+s.s||0}</td><td>${+s.h||0}</td><td>${g.indiv[n]?(+s.t||0):'—'}</td><td>${r.place[n]||'—'}</td><td>${r.bingo[n]?'🎯 ':''}${money(sumD(r.d[n]))}</td></tr>`}).join('')}
+    </tbody></table></div>
+    ${Object.keys(r.bingo).length?`<p class="hint" style="margin-top:8px">🎯 賓果：${Object.keys(r.bingo).map(esc).join('、')}</p>`:''}
+    <div class="btns"><button class="btn warn" data-act="delgame" data-i="${i}">刪除這局</button></div></details>`}).join('');
+  return h;
+}
+
+function totals(){const tot={};S.games.forEach(g=>{const r=compute(g);Object.entries(r.d).forEach(([n,x])=>{tot[n]=tot[n]||{team:0,indiv:0,turkey:0};tot[n].team+=x.team;tot[n].indiv+=x.indiv;tot[n].turkey+=x.turkey})});return tot}
+const m$=n=>{n=Math.round(n);return n>0?`+$${n}`:n<0?`-$${-n}`:'$0'};
+function exportText(){
+  const tot=totals();const rows=Object.entries(tot).sort((a,b)=>sumD(a[1])-sumD(b[1]));
+  let t=`🎳 家族保齡球賽 ${fmtDate(S.date)}\n共 ${S.games.length} 局\n\n【每人結算】\n`;
+  rows.forEach(([n,x])=>{t+=`${n}　${m$(sumD(x))}（團體${m$(x.team)}／個人${m$(x.indiv)}／火雞${m$(x.turkey)}）\n`});
+  t+=`\n【各局比分】\n`;
+  S.games.forEach((g,i)=>{const r=compute(g);
+    t+=`第${i+1}局　甲 ${r.A} : ${r.B} 乙（${r.loser?(r.loser==='A'?'乙':'甲')+'隊勝':'平手'}）\n`;
+    ['A','B'].forEach(k=>{t+=`${TEAM[k]}：`+Object.keys(g.teams).filter(n=>g.teams[n]===k).map(n=>{const s=g.scores[n];const hc=+s.h||0;const tk=g.indiv[n]&&+s.t>=3?` ${s.t}火雞`:'';return `${n} ${+s.s||0}${hc?(hc>0?'+':'')+hc:''}${tk}`}).join('、')+'\n'});
+    const bg=Object.keys(r.bingo);if(bg.length)t+=`🎯 賓果：${bg.join('、')}\n`;
+    const w=Object.keys(r.place).filter(n=>r.place[n]==='贏');if(w.length)t+=`個人賽贏家：${w.join('、')}\n`;
+  });
+  return t.trim();
+}
+
+async function drawImage(){
+  try{await document.fonts.ready}catch(e){}
+  const C={bg:'#E9F1EC',card:'#FFFFFF',ink:'#1B2A4A',muted:'#5B6B80',line:'#C6D6CD',stripe:'#F2F7F4',red:'#C8283C',blue:'#2E5E8C',gold:'#B7800F',goldsoft:'#FBEBC8',As:'#DCE7F2',Bs:'#F6DCE0'};
+  const F='"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif', N='"Barlow Condensed","Arial Narrow",sans-serif';
+  const tot=totals(), rows=Object.entries(tot).sort((a,b)=>sumD(a[1])-sumD(b[1]));
+  const W=750, P=24, RH=46, GRH=40;
+  const games=S.games.map(g=>({g,r:compute(g),ns:Object.keys(g.teams).sort((a,b)=>(g.teams[a]>g.teams[b]?1:g.teams[a]<g.teams[b]?-1:(+g.scores[b].s||0)-(+g.scores[a].s||0)))}));
+  let H=130+RH*(rows.length+1)+40;
+  games.forEach(x=>H+=56+GRH*(x.ns.length+1)+(Object.keys(x.r.bingo).length?34:0)+24);
+  H+=20;
+  const sc=2, cv=document.createElement('canvas'); cv.width=W*sc; cv.height=H*sc;
+  const c=cv.getContext('2d'); c.scale(sc,sc);
+  c.fillStyle=C.bg; c.fillRect(0,0,W,H);
+  const txt=(s,x,y,o={})=>{c.font=`${o.w||500} ${o.s||20}px ${o.f||F}`;c.fillStyle=o.c||C.ink;c.textAlign=o.a||'left';c.textBaseline='middle';c.fillText(s,x,y)};
+  const mtxt=n=>{n=Math.round(n);return n>0?`+$${n}`:n<0?`−$${-n}`:'$0'};
+  const mcol=n=>n>0?C.blue:n<0?C.red:C.muted;
+  const card=(y,hh)=>{c.fillStyle=C.card;c.strokeStyle=C.line;c.lineWidth=1;c.beginPath();c.roundRect?c.roundRect(P,y,W-2*P,hh,14):c.rect(P,y,W-2*P,hh);c.fill();c.stroke()};
+  // title
+  txt('🎳 家族保齡球賽',P+4,46,{s:34,w:900});
+  txt(`${fmtDate(S.date)}　共 ${S.games.length} 局`,P+4,92,{s:22,c:C.muted});
+  // main table
+  let y=130; card(y,RH*(rows.length+1));
+  const X={n:P+20,t:340,i:450,k:560,s:W-P-20};
+  c.fillStyle=C.ink;c.beginPath();c.roundRect?c.roundRect(P,y,W-2*P,RH,[14,14,0,0]):c.rect(P,y,W-2*P,RH);c.fill();
+  [['人',X.n,'left'],['團體賽',X.t,'right'],['個人賽',X.i,'right'],['火雞',X.k,'right'],['合計',X.s,'right']].forEach(([s,x,a])=>txt(s,x,y+RH/2,{s:18,w:700,c:'#fff',a}));
+  rows.forEach(([n,x],i)=>{const yy=y+RH*(i+1);
+    if(i%2){c.fillStyle=C.stripe;c.fillRect(P+1,yy,W-2*P-2,RH)}
+    txt(n,X.n,yy+RH/2,{s:22,w:700});
+    [['team',X.t],['indiv',X.i],['turkey',X.k]].forEach(([k,xx])=>txt(mtxt(x[k]),xx,yy+RH/2,{s:24,w:600,f:N,c:mcol(x[k]),a:'right'}));
+    const t=sumD(x); txt(mtxt(t),X.s,yy+RH/2,{s:28,w:700,f:N,c:mcol(t),a:'right'});
+  });
+  y+=RH*(rows.length+1)+40;
+  // games
+  const G={n:P+20,tm:200,s:330,h:405,k:480,p:560,m:W-P-20};
+  games.forEach(({g,r,ns},gi)=>{
+    const win=r.loser?(r.loser==='A'?'乙隊勝':'甲隊勝'):'平手';
+    txt(`第 ${gi+1} 局`,P+4,y+20,{s:24,w:900});
+    txt(`甲 ${r.A} : ${r.B} 乙　${win}`,W-P-4,y+20,{s:22,w:700,a:'right'});
+    y+=44;
+    const bh=GRH*(ns.length+1); card(y,bh);
+    [['人',G.n,'left'],['隊',G.tm,'center'],['分數',G.s,'right'],['讓分',G.h,'right'],['火雞',G.k,'right'],['個人',G.p,'center'],['本局',G.m,'right']].forEach(([s,x,a])=>txt(s,x,y+GRH/2,{s:16,c:C.muted,a}));
+    c.strokeStyle=C.line;c.beginPath();c.moveTo(P,y+GRH);c.lineTo(W-P,y+GRH);c.stroke();
+    ns.forEach((n,i)=>{const yy=y+GRH*(i+1), s=g.scores[n], tm=g.teams[n];
+      if(i%2){c.fillStyle=C.stripe;c.fillRect(P+1,yy,W-2*P-2,GRH)}
+      txt(n,G.n,yy+GRH/2,{s:20,w:700});
+      c.fillStyle=tm==='A'?C.As:C.Bs;c.beginPath();c.roundRect?c.roundRect(G.tm-26,yy+8,52,GRH-16,6):c.rect(G.tm-26,yy+8,52,GRH-16);c.fill();
+      txt(TEAM[tm],G.tm,yy+GRH/2,{s:15,w:700,c:tm==='A'?C.blue:C.red,a:'center'});
+      txt(String(+s.s||0),G.s,yy+GRH/2,{s:24,w:700,f:N,a:'right'});
+      const hc=+s.h||0; txt(hc?(hc>0?'+':'')+hc:'—',G.h,yy+GRH/2,{s:22,w:600,f:N,c:hc?C.ink:C.muted,a:'right'});
+      const tk=g.indiv[n]?(+s.t||0):null; txt(tk==null?'—':String(tk),G.k,yy+GRH/2,{s:22,w:600,f:N,c:tk>=3?C.gold:C.muted,a:'right'});
+      const pl=r.place[n]; txt(pl||'—',G.p,yy+GRH/2,{s:17,w:700,c:pl==='贏'?C.blue:pl==='輸'?C.red:C.muted,a:'center'});
+      const v=sumD(r.d[n]); txt((r.bingo[n]?'🎯 ':'')+mtxt(v),G.m,yy+GRH/2,{s:24,w:700,f:N,c:mcol(v),a:'right'});
+    });
+    y+=bh;
+    const bg=Object.keys(r.bingo); if(bg.length){txt(`🎯 賓果：${bg.join('、')}`,P+4,y+20,{s:18,c:C.gold,w:700});y+=34}
+    y+=24;
+  });
+  return cv;
+}
+
+/* ---------- render ---------- */
+function render(){
+  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.tab===S.tab));
+  document.getElementById('gcount').textContent=fmtDate(S.date)+(S.games.length?`　已打 ${S.games.length} 局`:'');
+  const m=document.getElementById('main');
+  m.innerHTML=S.tab==='setup'?vSetup():S.tab==='game'?vGame():vBill();
+  updateStick(); save();
+}
+function updateStick(){
+  const st=document.getElementById('stick');
+  if(S.tab!=='game'){st.classList.add('hide');return}
+  const p=present(),t=teamsOf();
+  if(p.length<2||!p.every(n=>t[n])){st.classList.add('hide');return}
+  st.classList.remove('hide');
+  const g=curGame(); const miss=p.filter(n=>g.scores[n].s===''||g.scores[n].s==null);
+  document.getElementById('saveBtn').disabled=miss.length>0;
+  document.getElementById('saveBtn').textContent=`儲存第 ${S.games.length+1} 局`;
+  document.getElementById('stickMsg').textContent=miss.length?`還差 ${miss.length} 人的分數`:'分數都填好了';
+}
+function refreshLive(){
+  const g=curGame(),r=compute(g),p=present(),t=teamsOf();
+  const mem=k=>p.filter(n=>t[n]===k).map(esc).join('、');
+  const tb=document.getElementById('teamBox'); if(tb)tb.innerHTML=teamCards(r,mem);
+  p.forEach(n=>{const a=document.querySelector(`[data-adj="${CSS.escape(n)}"]`);if(a)a.textContent=r.adj(n);
+    const mo=document.querySelector(`[data-mon="${CSS.escape(n)}"]`);if(mo)mo.innerHTML=money(sumD(r.d[n]));
+    const bg=document.querySelector(`[data-bingo="${CSS.escape(n)}"]`);if(bg)bg.classList.toggle('hide',!r.bingo[n])});
+  updateStick(); save();
+}
+
+/* ---------- events ---------- */
+document.addEventListener('click',e=>{
+  const tb=e.target.closest('nav button'); if(tb){S.tab=tb.dataset.tab;render();window.scrollTo(0,0);return}
+  const b=e.target.closest('[data-act]'); if(!b)return;
+  const n=b.dataset.n, i=+b.dataset.i, c=S.cur;
+  switch(b.dataset.act){
+    case 'present': S.present[n]=!S.present[n]; if(S.present[n]&&S.hcp[n]==null)S.hcp[n]=0; break;
+    case 'add': {const v=document.getElementById('newName').value.trim(); if(v&&!S.roster.includes(v)){S.roster.push(v);S.present[v]=true;S.hcp[v]=0} break;}
+    case 'tab': S.tab=b.dataset.t; break;
+    case 'pick': if(!c.pick)c.pick=n; else if(c.pick===n)c.pick=null; else {c.pairs.push([c.pick,n,null]);c.pick=null} break;
+    case 'win': c.pairs[i][2]=n; break;
+    case 'unpair': c.pairs.splice(i,1); break;
+    case 'solo': c.solo[n]=b.dataset.v; break;
+    case 'clearpairs': c.pairs=[];c.solo={};c.pick=null; break;
+    case 'random': {const a=present().sort(()=>Math.random()-.5); c.pairs=[];c.solo={};c.pick=null;
+      for(let k=0;k+1<a.length;k+=2)c.pairs.push([a[k],a[k+1],Math.random()<.5?a[k]:a[k+1]]);
+      if(a.length%2)c.solo[a[a.length-1]]=Math.random()<.5?'A':'B'; break;}
+    case 'save': {const g=curGame(); S.games.push(JSON.parse(JSON.stringify(g))); S.cur={pairs:[],solo:{},scores:{},pick:null}; S.tab='bill'; window.scrollTo(0,0); break;}
+    case 'delgame': ask(`確定刪除第 ${i+1} 局？`,()=>{S.games.splice(i,1);render()}); return;
+    case 'reset': ask('確定清空所有局數紀錄？',()=>{S.games=[];S.cur={pairs:[],solo:{},scores:{},pick:null};S.date=today();render()}); return;
+    case 'next': S.cur={pairs:[],solo:{},scores:{},pick:null}; S.tab='game'; window.scrollTo(0,0); break;
+    case 'img': {b.disabled=true;b.textContent='產生中…';
+      drawImage().then(async cv=>{const out=document.getElementById('imgOut');
+        out.innerHTML=`<img alt="結算表" src="${cv.toDataURL('image/png')}"><div class="btns"><button class="btn line" id="shareImg">分享 / 儲存圖片</button></div><p class="hint" id="shareHint" style="margin-top:8px">按下後選 LINE 傳到群組，或選「儲存影像」存到相簿。</p>`;
+        b.disabled=false;b.textContent='重新產生圖片';
+        const sb=document.getElementById('shareImg'), hint=document.getElementById('shareHint');
+        const name=`保齡球結算_${S.date}.png`;
+        sb.onclick=()=>cv.toBlob(async bl=>{
+          const f=new File([bl],name,{type:'image/png'});
+          if(navigator.canShare&&navigator.canShare({files:[f]})){
+            try{await navigator.share({files:[f]});return}catch(err){if(err&&err.name==='AbortError')return}
+          }
+          const u=URL.createObjectURL(bl);const a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();
+          setTimeout(()=>URL.revokeObjectURL(u),4000);
+          hint.textContent='圖片已下載。手機上也可以長按圖片儲存或分享。';
+        },'image/png');
+      }).catch(()=>{b.disabled=false;b.textContent='產生結算圖片'}); return;}
+    case 'copy': {const ta=document.getElementById('exp');const txt=exportText();
+      const done=()=>{b.textContent='已複製';setTimeout(()=>b.textContent='複製文字',1500)};
+      if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(txt).then(done,()=>{ta.classList.remove('hide');ta.select()});
+      else{ta.classList.remove('hide');ta.select()} return;}
+  }
+  render();
+});
+document.addEventListener('input',e=>{
+  const el=e.target, k=el.dataset.in, n=el.dataset.n; if(!k)return;
+  if(k==='date'){S.date=el.value;save();document.getElementById('gcount').textContent=fmtDate(S.date)+(S.games.length?`　已打 ${S.games.length} 局`:'');return}
+  if(k==='bingo'){S.bingo[+el.dataset.i]=el.value;save();return}
+  if(k==='bingoHcp'){S.bingoHcp=el.checked;save();return}
+  if(k==='hcp'){S.hcp[n]=+el.value||0; save(); return}
+  if(k==='indiv'){S.indiv[n]=el.checked; save(); return}
+  if(k==='useHcp'){S.useHcpIndiv=el.checked; save(); return}
+  const s=S.cur.scores[n]||(S.cur.scores[n]={s:'',h:S.hcp[n]||0,t:0});
+  s[k]=el.value; refreshLive();
+});
+render();
+</script>
+</body>
+</html>
