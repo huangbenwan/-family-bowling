@@ -260,8 +260,8 @@ function vGame(){
   <div class="box">${p.map(n=>`<div class="pair"><span class="nm" style="flex:1">${esc(n)}</span>
     <span class="seg"><button class="${t[n]==='A'?'on':''}" data-act="man" data-n="${esc(n)}" data-v="A">甲隊</button><button class="${t[n]==='B'?'on':''}" data-act="man" data-n="${esc(n)}" data-v="B">乙隊</button></span></div>`).join('')}</div>
   <div class="btns"><button class="btn ghost" data-act="clearpairs">重新分組</button></div>`; }
-  else h+=`<p class="hint">依序點兩個人配成一對猜拳，再點贏的那位。猜拳贏的進甲隊、輸的進乙隊。</p>
-  <div class="chips">${free.map(n=>`<button class="chip ${S.cur.pick===n?'sel':''}" data-act="pick" data-n="${esc(n)}">${esc(n)}</button>`).join('')||'<span class="hint">全員都配好了</span>'}</div>
+  else h+=`<p class="hint">依序點兩個人配成一對猜拳，再點贏的那位。猜拳贏的進甲隊、輸的進乙隊。「幫我隨機猜拳」只會替還沒分輸贏的組別決定，已經配好的組合和落單的人不會變。</p>
+  <div class="chips">${free.length===1?'<span class="hint">配對完成，落單的人請在下方選隊。</span>':free.map(n=>`<button class="chip ${S.cur.pick===n?'sel':''}" data-act="pick" data-n="${esc(n)}">${esc(n)}</button>`).join('')||'<span class="hint">全員都配好了</span>'}</div>
   <div class="box" style="margin-top:10px">${S.cur.pairs.length?S.cur.pairs.map((pr,i)=>`
     <div class="pair">
       <button class="who ${pr[2]===pr[0]?'win':pr[2]?'lose':''}" data-act="win" data-i="${i}" data-n="${esc(pr[0])}">${pr[2]===pr[0]?'✊ ':''}${esc(pr[0])}</button>
@@ -269,7 +269,7 @@ function vGame(){
       <button class="who ${pr[2]===pr[1]?'win':pr[2]?'lose':''}" data-act="win" data-i="${i}" data-n="${esc(pr[1])}">${pr[2]===pr[1]?'✊ ':''}${esc(pr[1])}</button>
       <button class="x" aria-label="拆開這組" data-act="unpair" data-i="${i}">×</button>
     </div>`).join(''):'<div class="empty" style="padding:10px">還沒有配對</div>'}
-    ${free.length===1?`<div class="pair"><span class="nm" style="flex:1">${esc(free[0])}（落單）</span>
+    ${free.length===1?`<div class="pair" style="flex-wrap:wrap;${S.cur.solo[free[0]]?'':'background:var(--goldsoft);margin:6px -6px 0;padding:10px 6px;border-radius:10px'}"><span style="flex:1;min-width:150px"><span class="nm">${esc(free[0])}</span>（落單）<br><span class="hint" style="font-size:13px">${S.cur.solo[free[0]]?'已加入'+TEAM[S.cur.solo[free[0]]]+'，可以再改':'自己選要加入哪一隊'}</span></span>
       <span class="seg"><button class="${S.cur.solo[free[0]]==='A'?'on':''}" data-act="solo" data-n="${esc(free[0])}" data-v="A">甲隊</button><button class="${S.cur.solo[free[0]]==='B'?'on':''}" data-act="solo" data-n="${esc(free[0])}" data-v="B">乙隊</button></span></div>`:''}
   </div>
   <div class="btns"><button class="btn ghost" data-act="random">幫我隨機猜拳</button><button class="btn ghost" data-act="clearpairs">重新分組</button></div>`;
@@ -497,9 +497,14 @@ document.addEventListener('click',e=>{
     case 'billtab': S.billTab=b.dataset.v; break;
     case 'mode': c.mode=b.dataset.v; break;
     case 'man': (c.manual=c.manual||{})[n]=b.dataset.v; break;
-    case 'random': {const a=present().sort(()=>Math.random()-.5); c.pairs=[];c.solo={};c.pick=null;
-      for(let k=0;k+1<a.length;k+=2)c.pairs.push([a[k],a[k+1],Math.random()<.5?a[k]:a[k+1]]);
-      if(a.length%2)c.solo[a[a.length-1]]=Math.random()<.5?'A':'B'; break;}
+    case 'random': { // 保留已配好的組合與落單者，只幫沒決定的人猜拳
+      c.pick=null;
+      c.pairs.forEach(pr=>{ if(!pr[2]) pr[2]=Math.random()<.5?pr[0]:pr[1]; });
+      const rest=present().filter(x=>!inPair(x)).sort(()=>Math.random()-.5);
+      if(rest.length>=2){ const keepSolo=rest.length%2?rest.find(x=>c.solo[x])||null:null;
+        const pool=keepSolo?rest.filter(x=>x!==keepSolo):rest;
+        for(let k=0;k+1<pool.length;k+=2)c.pairs.push([pool[k],pool[k+1],Math.random()<.5?pool[k]:pool[k+1]]); }
+      break;}
     case 'save': {const g=curGame(); S.games.push(JSON.parse(JSON.stringify(g))); S.cur=newCur(); S.tab='bill'; window.scrollTo(0,0); break;}
     case 'delgame': ask(`確定刪除第 ${i+1} 局？`,()=>{S.games.splice(i,1);render()}); return;
     case 'reset': ask('確定清空所有局數紀錄？',()=>{S.games=[];S.cur=newCur();S.date=today();render()}); return;
