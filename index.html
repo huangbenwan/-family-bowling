@@ -192,7 +192,7 @@ function compute(g){
     const vals=[...new Set(P.map(val))].sort((a,b)=>b-a);
     const win=P.filter(n=>val(n)===vals[0]);
     let exempt=[];
-    if(P.length>=5&&win.length===1&&vals.length>1) exempt=P.filter(n=>val(n)===vals[1]);
+    // 第二名不再免輸，除第一名外全部 -$100
     const lose=P.filter(n=>!win.includes(n)&&!exempt.includes(n));
     lose.forEach(n=>{d[n].indiv=-100;place[n]='輸'});
     exempt.forEach(n=>place[n]='第二');
