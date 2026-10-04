@@ -84,6 +84,10 @@ input:focus-visible,button:focus-visible{outline:3px solid var(--gold);outline-o
 .money{font:700 18px var(--num);white-space:nowrap}
 .pos{color:var(--lane)}.neg{color:var(--red)}.zero{color:var(--muted)}
 table{width:100%;border-collapse:collapse;font-size:15px}
+.mx td,.mx th{white-space:nowrap}
+.mx .mk{font-size:12px;color:var(--muted)}
+.mx .tt{background:var(--lanesoft);font-weight:700}
+.mx td.nm{position:sticky;left:0;background:var(--card)}
 th,td{padding:8px 6px;text-align:right;border-bottom:1px solid var(--line)}
 th:first-child,td:first-child{text-align:left}
 th{font-size:13px;color:var(--muted);font-weight:500}
@@ -127,14 +131,14 @@ input[type=date]{font:600 17px var(--f);padding:6px 10px;border:1.5px solid var(
 const KEY='family-bowling-v1';
 const DEFAULT=['軍','靖','WD瀧','Yu','阿娟','見雄','俊儀','開庭','宏進','川平','川豪','紀婷'];
 const today=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};
-const fresh=()=>({date:today(),bingo:['','','',''],bingoHcp:false,roster:[...DEFAULT],present:{},hcp:{},indiv:{},useHcpIndiv:true,games:[],cur:{pairs:[],solo:{},scores:{},pick:null},tab:'setup'});
+const fresh=()=>({date:today(),bingo:['','','',''],bingoHcp:false,roster:[...DEFAULT],present:{},hcp:{},hcpI:{},indiv:{},turkeyP:{},noCount:{},useHcpIndiv:true,games:[],cur:{pairs:[],solo:{},scores:{},pick:null,mode:'rps',manual:{}},tab:'setup'});
 let S;
 try{S=JSON.parse(localStorage.getItem(KEY))||fresh()}catch(e){S=fresh()}
-S=Object.assign(fresh(),S);
+S=Object.assign(fresh(),S); S.hcpI=S.hcpI||{}; S.turkeyP=S.turkeyP||{}; S.noCount=S.noCount||{};
 (function rename(o,n){ // 舊紀錄改名
   if(!S.roster.includes(o))return;
   S.roster=S.roster.map(x=>x===o?n:x);
-  ['present','hcp','indiv'].forEach(k=>{if(o in S[k]){S[k][n]=S[k][o];delete S[k][o]}});
+  ['present','hcp','hcpI','indiv','turkeyP','noCount'].forEach(k=>{if(o in S[k]){S[k][n]=S[k][o];delete S[k][o]}});
   const mv=m=>{if(m&&o in m){m[n]=m[o];delete m[o]}};
   S.games.forEach(g=>{mv(g.teams);mv(g.scores);mv(g.indiv)});
   mv(S.cur.scores);mv(S.cur.solo);
@@ -152,8 +156,11 @@ const money=n=>{n=Math.round(n);return n>0?`<span class="money pos">+$${n}</span
 const TEAM={A:'甲隊',B:'乙隊'};
 
 /* ---------- team assignment from pairs ---------- */
+function newCur(){return {pairs:[],solo:{},scores:{},pick:null,mode:(S.cur&&S.cur.mode)||'rps',manual:{}}}
+const inT=(g,n)=>g.turkeyP?!!g.turkeyP[n]:!!g.indiv[n];
 function teamsOf(){
   const t={};
+  if(S.cur.mode==='manual'){Object.entries(S.cur.manual||{}).forEach(([n,v])=>{if(S.present[n])t[n]=v});return t}
   S.cur.pairs.forEach(p=>{ if(p[2]){t[p[2]]='A';t[p[0]===p[2]?p[1]:p[0]]='B';} });
   Object.entries(S.cur.solo).forEach(([n,v])=>{ if(S.present[n]&&!inPair(n)) t[n]=v; });
   return t;
@@ -170,16 +177,16 @@ function compute(g){
   names.forEach(n=>d[n]={team:0,indiv:0,turkey:0});
   const sc=n=>g.scores[n]||{};
   const raw=n=>+sc(n).s||0, adj=n=>raw(n)+(+sc(n).h||0);
-  let A=0,B=0; names.forEach(n=>g.teams[n]==='A'?A+=adj(n):B+=adj(n));
+  let A=0,B=0; const cnt=n=>!sc(n).nc; names.filter(cnt).forEach(n=>g.teams[n]==='A'?A+=adj(n):B+=adj(n));
   const loser=A>B?'B':B>A?'A':null;
   if(loser) names.forEach(n=>{if(g.teams[n]===loser)d[n].team=-200});
   const bingo={}, bl=(g.bingo||[]).filter(v=>v!==''&&v!=null).map(Number);
   if(loser&&bl.length&&names.length>=2){
-    const th=names.map(raw).sort((a,b)=>a-b)[1];
-    names.forEach(n=>{ if(raw(n)<=th){ const v=g.bingoHcp?adj(n):raw(n);
+    const CN=names.filter(cnt); const th=CN.map(raw).sort((a,b)=>a-b)[1];
+    if(CN.length>=2) CN.forEach(n=>{ if(raw(n)<=th){ const v=g.bingoHcp?adj(n):raw(n);
       if(bl.includes(v)){ bingo[n]=true; if(g.teams[n]===loser) d[n].team=-100; } } });
   }
-  const P=names.filter(n=>g.indiv[n]); const val=n=>g.useHcp?adj(n):raw(n);
+  const P=names.filter(n=>g.indiv[n]); const val=n=>g.v>=2?raw(n)+(+sc(n).hi||0):(g.useHcp?adj(n):raw(n));
   const place={};
   if(P.length>=2){
     const vals=[...new Set(P.map(val))].sort((a,b)=>b-a);
@@ -190,14 +197,17 @@ function compute(g){
     lose.forEach(n=>{d[n].indiv=-100;place[n]='輸'});
     exempt.forEach(n=>place[n]='第二');
     win.forEach(n=>{d[n].indiv=lose.length*100/win.length;place[n]=lose.length?'贏':'平'});
-    P.forEach(n=>{const k=+sc(n).t||0; if(k>=3){const amt=(k-2)*20; P.forEach(o=>{if(o!==n){d[o].turkey-=amt;d[n].turkey+=amt}})}});
   }
-  return {A,B,loser,d,P,place,adj,val,bingo};
+  const T=names.filter(n=>inT(g,n)), tlog=[];
+  if(T.length>=2) T.forEach(n=>{const k=+sc(n).t||0; if(k>=3){const amt=(k-2)*20, from=T.filter(o=>o!==n);
+    from.forEach(o=>{d[o].turkey-=amt;d[n].turkey+=amt}); tlog.push({to:n,k,amt,from})}});
+  return {A,B,loser,d,P,place,adj,val,bingo,tlog};
 }
 function curGame(){
   const teams=teamsOf(), scores={}, indiv={};
-  Object.keys(teams).forEach(n=>{scores[n]=S.cur.scores[n]||{s:'',h:S.hcp[n]||0,t:0}; if(S.indiv[n])indiv[n]=true});
-  return {teams,scores,indiv,useHcp:S.useHcpIndiv,bingo:S.bingo.filter(v=>v!==''),bingoHcp:S.bingoHcp};
+  const turkeyP={};
+  Object.keys(teams).forEach(n=>{scores[n]=S.cur.scores[n]||{s:'',h:S.hcp[n]||0,hi:S.hcpI[n]||0,t:0}; if(scores[n].hi==null)scores[n].hi=S.hcpI[n]||0; if(S.indiv[n])indiv[n]=true; if(S.turkeyP[n])turkeyP[n]=true; if(scores[n].nc==null)scores[n].nc=!!S.noCount[n]});
+  return {v:2,teams,scores,indiv,turkeyP,useHcp:S.useHcpIndiv,bingo:S.bingo.filter(v=>v!==''),bingoHcp:S.bingoHcp};
 }
 
 /* ---------- views ---------- */
@@ -212,16 +222,20 @@ function vSetup(){
   <div class="btns" style="margin-top:10px">
     <input type="text" id="newName" placeholder="新增人名" maxlength="8"><button class="btn ghost" data-act="add">新增</button>
   </div>
-  <h2>讓分與個人賽</h2>
-  <p class="hint">讓分會自動帶入每一局，打完輸入分數時也能再改。</p>
+  <h2>讓分、個人賽、火雞賽</h2>
+  <p class="hint">團體讓分和個人讓分分開算，會自動帶入每一局，打完輸入分數時也能再改。個人賽和火雞賽各自選擇要不要參加。</p>
   <div class="box">${p.length?p.map(n=>`
-    <div class="row"><span class="nm">${esc(n)}</span>
-      <label class="sm">讓分 <input type="number" inputmode="numeric" data-in="hcp" data-n="${esc(n)}" value="${S.hcp[n]||0}"></label>
-      <label class="sm">個人賽 <input type="checkbox" class="tog" data-in="indiv" data-n="${esc(n)}" ${S.indiv[n]?'checked':''}></label>
+    <div class="score"><div class="top"><span class="nm">${esc(n)}</span></div>
+      <div class="fields">
+        <label class="sm">團體讓分 <input type="number" inputmode="numeric" data-in="hcp" data-n="${esc(n)}" value="${S.hcp[n]||0}"></label>
+        <label class="sm">個人讓分 <input type="number" inputmode="numeric" data-in="hcpI" data-n="${esc(n)}" value="${S.hcpI[n]||0}"></label>
+      </div>
+      <div class="fields">
+        <label class="sm">個人賽 <input type="checkbox" class="tog" data-in="indiv" data-n="${esc(n)}" ${S.indiv[n]?'checked':''}></label>
+        <label class="sm">火雞賽 <input type="checkbox" class="tog" data-in="turkeyP" data-n="${esc(n)}" ${S.turkeyP[n]?'checked':''}></label>
+        <label class="sm">團體不計分 <input type="checkbox" class="tog" data-in="noCount" data-n="${esc(n)}" ${S.noCount[n]?'checked':''}></label>
+      </div>
     </div>`).join(''):`<div class="empty">先在上面點選出席的人</div>`}
-  </div>
-  <div class="box" style="margin-top:10px">
-    <div class="row" style="grid-template-columns:1fr auto"><span>個人賽排名要加讓分</span><input type="checkbox" class="tog" data-in="useHcp" ${S.useHcpIndiv?'checked':''}></div>
   </div>
   <h2>賓果數字</h2>
   <p class="hint">最多 4 組。每局分數最低的兩人，分數剛好等於其中一個數字，團體賽輸了只要付 $100。不玩就留空。</p>
@@ -239,8 +253,14 @@ function vGame(){
   const p=present(); if(p.length<2) return `<div class="empty">先到「設定」選至少兩位出席的人</div>`;
   const free=p.filter(n=>!inPair(n));
   const t=teamsOf(); const ready=p.every(n=>t[n]);
-  let h=`<h2>第 ${S.games.length+1} 局：猜拳分組</h2>
-  <p class="hint">依序點兩個人配成一對猜拳，再點贏的那位。猜拳贏的進甲隊、輸的進乙隊。</p>
+  const manual=S.cur.mode==='manual';
+  let h=`<h2>第 ${S.games.length+1} 局：分組</h2>
+  <div class="seg" style="margin-bottom:10px"><button class="${manual?'':'on'}" data-act="mode" data-v="rps">猜拳分組</button><button class="${manual?'on':''}" data-act="mode" data-v="manual">自行分組</button></div>`;
+  if(manual){ h+=`<p class="hint">直接幫每個人選甲隊或乙隊。</p>
+  <div class="box">${p.map(n=>`<div class="pair"><span class="nm" style="flex:1">${esc(n)}</span>
+    <span class="seg"><button class="${t[n]==='A'?'on':''}" data-act="man" data-n="${esc(n)}" data-v="A">甲隊</button><button class="${t[n]==='B'?'on':''}" data-act="man" data-n="${esc(n)}" data-v="B">乙隊</button></span></div>`).join('')}</div>
+  <div class="btns"><button class="btn ghost" data-act="clearpairs">重新分組</button></div>`; }
+  else h+=`<p class="hint">依序點兩個人配成一對猜拳，再點贏的那位。猜拳贏的進甲隊、輸的進乙隊。</p>
   <div class="chips">${free.map(n=>`<button class="chip ${S.cur.pick===n?'sel':''}" data-act="pick" data-n="${esc(n)}">${esc(n)}</button>`).join('')||'<span class="hint">全員都配好了</span>'}</div>
   <div class="box" style="margin-top:10px">${S.cur.pairs.length?S.cur.pairs.map((pr,i)=>`
     <div class="pair">
@@ -259,36 +279,36 @@ function vGame(){
   h+=`<h2>比分</h2>
   <div class="teams" id="teamBox">${teamCards(r,mem)}</div>
   <h2>輸入分數</h2>
-  <p class="hint">分數是實際打的分，讓分會加上去計算。火雞填「最長連續全倒數」，3 以上才算。${g.bingo.length?`<br>賓果數字：${g.bingo.map(esc).join('、')}（最低兩名${g.bingoHcp?'加讓分後':''}打中，輸了只付 $100）`:''}</p>
+  <p class="hint">分數是實際打的分，讓分會加上去計算。團體賽用團體讓分，個人賽用個人讓分。「不計分」的人分數不加進隊伍總分，但隊伍輸了一樣要付。火雞填「最長連續全倒數」，3 以上才算。${g.bingo.length?`<br>賓果數字：${g.bingo.map(esc).join('、')}（最低兩名${g.bingoHcp?'加讓分後':''}打中，輸了只付 $100）`:''}</p>
   <div class="box">${p.map(n=>{const s=g.scores[n];return `
     <div class="score">
-      <div class="top"><span class="nm">${esc(n)}<span class="tag ${t[n]}">${TEAM[t[n]]}</span>${g.indiv[n]?'<span class="tag i">個人賽</span>':''}<span class="tag b ${r.bingo[n]?'':'hide'}" data-bingo="${esc(n)}">🎯 賓果</span></span>
+      <div class="top"><span class="nm">${esc(n)}<span class="tag ${t[n]}">${TEAM[t[n]]}</span>${g.indiv[n]?'<span class="tag i">個人賽</span>':''}${g.turkeyP[n]?'<span class="tag i">火雞賽</span>':''}<span class="tag B ${s.nc?'':'hide'}" data-nc="${esc(n)}">不計分</span><span class="tag b ${r.bingo[n]?'':'hide'}" data-bingo="${esc(n)}">🎯 賓果</span></span>
         <span><span class="adj" data-adj="${esc(n)}">${r.adj(n)}</span> <span data-mon="${esc(n)}">${money(sumD(r.d[n]))}</span></span></div>
       <div class="fields">
         <label class="sm">分數 <input type="number" inputmode="numeric" min="0" max="300" data-in="s" data-n="${esc(n)}" value="${esc(s.s)}"></label>
-        <label class="sm">讓分 <input type="number" inputmode="numeric" data-in="h" data-n="${esc(n)}" value="${esc(s.h)}"></label>
-        ${g.indiv[n]?`<label class="sm">火雞 <input type="number" inputmode="numeric" min="0" max="12" data-in="t" data-n="${esc(n)}" value="${esc(s.t||0)}"></label>`:''}
+        <label class="sm">團體讓分 <input type="number" inputmode="numeric" data-in="h" data-n="${esc(n)}" value="${esc(s.h)}"></label>
+        <label class="sm">不計分 <input type="checkbox" class="tog" data-in="nc" data-n="${esc(n)}" ${s.nc?'checked':''}></label>
+        ${g.indiv[n]?`<label class="sm">個人讓分 <input type="number" inputmode="numeric" data-in="hi" data-n="${esc(n)}" value="${esc(s.hi)}"></label>`:''}
+        ${g.turkeyP[n]?`<label class="sm">火雞 <input type="number" inputmode="numeric" min="0" max="12" data-in="t" data-n="${esc(n)}" value="${esc(s.t||0)}"></label>`:''}
       </div>
     </div>`}).join('')}</div>`;
   return h;
 }
-const sumD=x=>x.team+x.indiv+x.turkey;
+const sumD=x=>x.team+x.indiv; // 火雞另計
 function teamCards(r,mem){
   return ['A','B'].map(k=>`<div class="team ${r.loser&&r.loser!==k?'lead':''}"><h3>${TEAM[k]}</h3><div class="tot">${k==='A'?r.A:r.B}</div><div class="mem">${mem(k)}</div></div>`).join('');
 }
 function vBill(){
   if(!S.games.length) return `<div class="empty">${fmtDate(S.date)}<br>還沒有儲存任何一局。打完第一局後在「本局」按儲存。</div>`;
-  const tot=totals();
-  const rows=Object.entries(tot).sort((a,b)=>sumD(a[1])-sumD(b[1]));
-  const col=k=>rows.reduce((s,[,x])=>s+x[k],0);
+  const bt=S.billTab||'team';
   let h=`<div class="btns"><button class="btn" data-act="next">下一局（第 ${S.games.length+1} 局）</button></div>
-  <h2>${fmtDate(S.date)}　共 ${S.games.length} 局，每人要付</h2>
-  <p class="hint">負數是要付出去的錢，正數是可以收的錢。</p>
-  <div class="box scroll"><table>
-    <thead><tr><th>人</th><th>團體賽</th><th>個人賽</th><th>火雞</th><th>合計</th></tr></thead>
-    <tbody>${rows.map(([n,x])=>`<tr><td class="nm">${esc(n)}</td><td>${money(x.team)}</td><td>${money(x.indiv)}</td><td>${money(x.turkey)}</td><td class="money">${money(sumD(x))}</td></tr>`).join('')}</tbody>
-    <tfoot><tr><td>總計</td><td>${money(col('team'))}</td><td>${money(col('indiv'))}</td><td>${money(col('turkey'))}</td><td></td></tr></tfoot>
-  </table></div>
+  <h2>${fmtDate(S.date)}　共 ${S.games.length} 局</h2>
+  <p class="hint">三種賽各自結算。負數是要付出去的錢，正數是可以收的錢。</p>
+  <div class="seg" style="margin:4px 0 10px;display:flex">${Object.entries(KIND).map(([k,l])=>`<button style="flex:1" class="${bt===k?'on':''}" data-act="billtab" data-v="${k}">${l}</button>`).join('')}</div>
+  <h2 style="margin-top:6px">${KIND[bt]}合計明細</h2>
+  ${matrixHtml(bt)}
+  ${bt==='turkey'?tlogHtml().replace('<h2>火雞明細</h2>','<h2>誰給誰</h2>'):''}
+  ${tlogHtml()}
   <h2>分享結果</h2>
   <div class="btns" style="margin-top:4px"><button class="btn" data-act="img">產生結算圖片</button></div>
   <div id="imgOut"></div>
@@ -297,24 +317,58 @@ function vBill(){
   <h2>各局紀錄</h2>`;
   h+=S.games.map((g,i)=>{const r=compute(g);const ns=Object.keys(g.teams);
     return `<details class="box game"><summary><span>第 ${i+1} 局</span><span>甲 ${r.A} : ${r.B} 乙　${r.loser?TEAM[r.loser==='A'?'B':'A']+'勝':'平手'}</span></summary>
-    <div class="scroll"><table style="margin-top:8px"><thead><tr><th>人</th><th>隊</th><th>分數</th><th>讓</th><th>火雞</th><th>個人</th><th>本局</th></tr></thead><tbody>
-    ${ns.map(n=>{const s=g.scores[n];return `<tr><td>${esc(n)}</td><td><span class="tag ${g.teams[n]}" style="margin:0">${TEAM[g.teams[n]]}</span></td><td>${+s.s||0}</td><td>${+s.h||0}</td><td>${g.indiv[n]?(+s.t||0):'—'}</td><td>${r.place[n]||'—'}</td><td>${r.bingo[n]?'🎯 ':''}${money(sumD(r.d[n]))}</td></tr>`}).join('')}
+    <div class="scroll"><table style="margin-top:8px"><thead><tr><th>人</th><th>隊</th><th>分數</th><th>團讓</th><th>個讓</th><th>火雞</th><th>個人</th><th>本局</th></tr></thead><tbody>
+    ${ns.map(n=>{const s=g.scores[n];return `<tr><td>${esc(n)}</td><td><span class="tag ${g.teams[n]}" style="margin:0">${TEAM[g.teams[n]]}</span></td><td>${+s.s||0}${s.nc?'<br><span class="hint" style="font-size:12px">不計分</span>':''}</td><td>${+s.h||0}</td><td>${g.indiv[n]&&g.v>=2?(+s.hi||0):'—'}</td><td>${inT(g,n)?(+s.t||0):'—'}</td><td>${r.place[n]||'—'}</td><td>${r.bingo[n]?'🎯 ':''}${money(sumD(r.d[n]))}</td></tr>`}).join('')}
     </tbody></table></div>
+    ${r.tlog.map(x=>`<p class="hint" style="margin:8px 0 0">${esc(tlogLine(x))}</p>`).join('')}
     ${Object.keys(r.bingo).length?`<p class="hint" style="margin-top:8px">🎯 賓果：${Object.keys(r.bingo).map(esc).join('、')}</p>`:''}
     <div class="btns"><button class="btn warn" data-act="delgame" data-i="${i}">刪除這局</button></div></details>`}).join('');
   return h;
 }
 
+const tlogLine=x=>`🦃 ${x.to} ${x.k} 火雞：${x.from.join('、')} 各給 $${x.amt}（共收 $${x.amt*x.from.length}）`;
+function tlogHtml(){
+  const L=[];S.games.forEach((g,i)=>compute(g).tlog.forEach(x=>L.push([i,x])));
+  if(!L.length)return '';
+  return `<h2>火雞明細</h2><div class="box">${L.map(([i,x])=>`<div class="pair" style="display:block"><b>第 ${i+1} 局</b>　${esc(x.to)} 打 ${x.k} 火雞<br><span class="hint">${x.from.map(esc).join('、')} 各給 ${esc(x.to)} $${x.amt}，共 $${x.amt*x.from.length}</span></div>`).join('')}</div>`;
+}
+const KIND={team:'團體賽',indiv:'個人賽',turkey:'火雞賽'};
+function matrix(k){
+  const P={};
+  S.games.forEach((g,gi)=>{const r=compute(g);
+    Object.keys(g.teams).forEach(n=>{
+      const on=k==='team'||(k==='indiv'?(!!g.indiv[n]&&r.P.length>=2):(inT(g,n)&&Object.keys(g.teams).filter(x=>inT(g,x)).length>=2));
+      if(!on)return;
+      const o=P[n]||(P[n]={cells:Array(S.games.length).fill(null),tot:0});
+      const v=r.d[n][k]; let m='';
+      if(k==='team'&&r.bingo[n])m='🎯'; if(k==='indiv')m=r.place[n]||''; if(k==='turkey'&&+g.scores[n].t>=3)m=g.scores[n].t+'🦃';
+      o.cells[gi]={v,m}; o.tot+=v;
+    })});
+  return Object.entries(P).sort((a,b)=>a[1].tot-b[1].tot);
+}
+function matrixHtml(k){
+  const rows=matrix(k);
+  if(!rows.length)return `<div class="empty">沒有人參加${KIND[k]}</div>`;
+  const gs=S.games.map((g,i)=>i);
+  return `<div class="box scroll"><table class="mx">
+    <thead><tr><th>人</th>${gs.map(i=>`<th>第${i+1}局</th>`).join('')}<th>合計</th></tr></thead>
+    <tbody>${rows.map(([n,o])=>`<tr><td class="nm">${esc(n)}</td>${o.cells.map(c=>c?`<td>${money(c.v)}${c.m?`<br><span class="mk">${esc(c.m)}</span>`:''}</td>`:'<td class="zero">—</td>').join('')}<td class="tt">${money(o.tot)}</td></tr>`).join('')}</tbody>
+    <tfoot><tr><td>總計</td>${gs.map(i=>`<td>${money(rows.reduce((s,[,o])=>s+(o.cells[i]?o.cells[i].v:0),0))}</td>`).join('')}<td class="tt">${money(rows.reduce((s,[,o])=>s+o.tot,0))}</td></tr></tfoot>
+  </table></div>`;
+}
 function totals(){const tot={};S.games.forEach(g=>{const r=compute(g);Object.entries(r.d).forEach(([n,x])=>{tot[n]=tot[n]||{team:0,indiv:0,turkey:0};tot[n].team+=x.team;tot[n].indiv+=x.indiv;tot[n].turkey+=x.turkey})});return tot}
 const m$=n=>{n=Math.round(n);return n>0?`+$${n}`:n<0?`-$${-n}`:'$0'};
 function exportText(){
-  const tot=totals();const rows=Object.entries(tot).sort((a,b)=>sumD(a[1])-sumD(b[1]));
-  let t=`🎳 家族保齡球賽 ${fmtDate(S.date)}\n共 ${S.games.length} 局\n\n【每人結算】\n`;
-  rows.forEach(([n,x])=>{t+=`${n}　${m$(sumD(x))}（團體${m$(x.team)}／個人${m$(x.indiv)}／火雞${m$(x.turkey)}）\n`});
+  let t=`🎳 家族保齡球賽 ${fmtDate(S.date)}\n共 ${S.games.length} 局\n`;
+  Object.entries(KIND).forEach(([k,l])=>{const rows=matrix(k); if(!rows.length)return;
+    t+=`\n【${l}合計】\n`;
+    rows.forEach(([n,o])=>{t+=`${n}　${m$(o.tot)}（${o.cells.map(c=>c?m$(c.v):'—').join('／')}）\n`});
+    if(k==='turkey')S.games.forEach((g,i)=>compute(g).tlog.forEach(x=>t+=`第${i+1}局 ${tlogLine(x)}\n`));
+  });
   t+=`\n【各局比分】\n`;
   S.games.forEach((g,i)=>{const r=compute(g);
     t+=`第${i+1}局　甲 ${r.A} : ${r.B} 乙（${r.loser?(r.loser==='A'?'乙':'甲')+'隊勝':'平手'}）\n`;
-    ['A','B'].forEach(k=>{t+=`${TEAM[k]}：`+Object.keys(g.teams).filter(n=>g.teams[n]===k).map(n=>{const s=g.scores[n];const hc=+s.h||0;const tk=g.indiv[n]&&+s.t>=3?` ${s.t}火雞`:'';return `${n} ${+s.s||0}${hc?(hc>0?'+':'')+hc:''}${tk}`}).join('、')+'\n'});
+    ['A','B'].forEach(k=>{t+=`${TEAM[k]}：`+Object.keys(g.teams).filter(n=>g.teams[n]===k).map(n=>{const s=g.scores[n];const hc=+s.h||0;const tk=inT(g,n)&&+s.t>=3?` ${s.t}火雞`:'';return `${n}${s.nc?'(不計分)':''} ${+s.s||0}${hc?(hc>0?'+':'')+hc:''}${tk}`}).join('、')+'\n'});
     const bg=Object.keys(r.bingo);if(bg.length)t+=`🎯 賓果：${bg.join('、')}\n`;
     const w=Object.keys(r.place).filter(n=>r.place[n]==='贏');if(w.length)t+=`個人賽贏家：${w.join('、')}\n`;
   });
@@ -325,10 +379,12 @@ async function drawImage(){
   try{await document.fonts.ready}catch(e){}
   const C={bg:'#E9F1EC',card:'#FFFFFF',ink:'#1B2A4A',muted:'#5B6B80',line:'#C6D6CD',stripe:'#F2F7F4',red:'#C8283C',blue:'#2E5E8C',gold:'#B7800F',goldsoft:'#FBEBC8',As:'#DCE7F2',Bs:'#F6DCE0'};
   const F='"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif', N='"Barlow Condensed","Arial Narrow",sans-serif';
-  const tot=totals(), rows=Object.entries(tot).sort((a,b)=>sumD(a[1])-sumD(b[1]));
-  const W=750, P=24, RH=46, GRH=40;
+  const MX=Object.entries(KIND).map(([k,l])=>({k,l,rows:matrix(k)})).filter(x=>x.rows.length);
+  const TL=[];S.games.forEach((g,i)=>compute(g).tlog.forEach(x=>TL.push(`第${i+1}局 ${tlogLine(x)}`)));
+  const ng=S.games.length, CW=86, NW=150;
+  const W=Math.max(750,48+NW+ng*CW+130), P=24, RH=46, GRH=40;
   const games=S.games.map(g=>({g,r:compute(g),ns:Object.keys(g.teams).sort((a,b)=>(g.teams[a]>g.teams[b]?1:g.teams[a]<g.teams[b]?-1:(+g.scores[b].s||0)-(+g.scores[a].s||0)))}));
-  let H=130+RH*(rows.length+1)+40;
+  let H=120; MX.forEach(x=>H+=50+RH*(x.rows.length+2)+(x.k==='turkey'?TL.length*30+10:0)+30);
   games.forEach(x=>H+=56+GRH*(x.ns.length+1)+(Object.keys(x.r.bingo).length?34:0)+24);
   H+=20;
   const sc=2, cv=document.createElement('canvas'); cv.width=W*sc; cv.height=H*sc;
@@ -338,39 +394,53 @@ async function drawImage(){
   const mtxt=n=>{n=Math.round(n);return n>0?`+$${n}`:n<0?`−$${-n}`:'$0'};
   const mcol=n=>n>0?C.blue:n<0?C.red:C.muted;
   const card=(y,hh)=>{c.fillStyle=C.card;c.strokeStyle=C.line;c.lineWidth=1;c.beginPath();c.roundRect?c.roundRect(P,y,W-2*P,hh,14):c.rect(P,y,W-2*P,hh);c.fill();c.stroke()};
-  // title
   txt('🎳 家族保齡球賽',P+4,46,{s:34,w:900});
-  txt(`${fmtDate(S.date)}　共 ${S.games.length} 局`,P+4,92,{s:22,c:C.muted});
-  // main table
-  let y=130; card(y,RH*(rows.length+1));
-  const X={n:P+20,t:340,i:450,k:560,s:W-P-20};
-  c.fillStyle=C.ink;c.beginPath();c.roundRect?c.roundRect(P,y,W-2*P,RH,[14,14,0,0]):c.rect(P,y,W-2*P,RH);c.fill();
-  [['人',X.n,'left'],['團體賽',X.t,'right'],['個人賽',X.i,'right'],['火雞',X.k,'right'],['合計',X.s,'right']].forEach(([s,x,a])=>txt(s,x,y+RH/2,{s:18,w:700,c:'#fff',a}));
-  rows.forEach(([n,x],i)=>{const yy=y+RH*(i+1);
-    if(i%2){c.fillStyle=C.stripe;c.fillRect(P+1,yy,W-2*P-2,RH)}
-    txt(n,X.n,yy+RH/2,{s:22,w:700});
-    [['team',X.t],['indiv',X.i],['turkey',X.k]].forEach(([k,xx])=>txt(mtxt(x[k]),xx,yy+RH/2,{s:24,w:600,f:N,c:mcol(x[k]),a:'right'}));
-    const t=sumD(x); txt(mtxt(t),X.s,yy+RH/2,{s:28,w:700,f:N,c:mcol(t),a:'right'});
+  txt(`${fmtDate(S.date)}　共 ${ng} 局`,P+4,92,{s:22,c:C.muted});
+  let y=120;
+  const gx=i=>P+20+NW+(i+1)*CW-10, tx=W-P-20;
+  MX.forEach(({k,l,rows})=>{
+    txt(`${l}合計明細`,P+4,y+24,{s:24,w:900}); y+=50;
+    const bh=RH*(rows.length+2); card(y,bh);
+    c.fillStyle=C.ink;c.beginPath();c.roundRect?c.roundRect(P,y,W-2*P,RH,[14,14,0,0]):c.rect(P,y,W-2*P,RH);c.fill();
+    txt('人',P+20,y+RH/2,{s:18,w:700,c:'#fff'});
+    for(let i=0;i<ng;i++)txt(`第${i+1}局`,gx(i),y+RH/2,{s:16,w:700,c:'#fff',a:'right'});
+    txt('合計',tx,y+RH/2,{s:18,w:700,c:'#fff',a:'right'});
+    c.fillStyle='rgba(46,94,140,.10)';c.fillRect(tx-105,y+RH,120,RH*(rows.length+1)-1);
+    rows.forEach(([n,o],ri)=>{const yy=y+RH*(ri+1);
+      if(ri%2){c.fillStyle=C.stripe;c.fillRect(P+1,yy,tx-105-P-1,RH)}
+      txt(n,P+20,yy+RH/2,{s:21,w:700});
+      o.cells.forEach((cl,i)=>{ if(!cl){txt('—',gx(i),yy+RH/2,{s:20,c:C.muted,a:'right'});return}
+        txt(mtxt(cl.v),gx(i),yy+(cl.m?RH/2-7:RH/2),{s:21,w:600,f:N,c:mcol(cl.v),a:'right'});
+        if(cl.m)txt(cl.m,gx(i),yy+RH/2+13,{s:12,w:700,c:C.muted,a:'right'}); });
+      txt(mtxt(o.tot),tx,yy+RH/2,{s:26,w:700,f:N,c:mcol(o.tot),a:'right'});
+    });
+    const fy=y+RH*(rows.length+1); c.strokeStyle=C.line;c.beginPath();c.moveTo(P,fy);c.lineTo(W-P,fy);c.stroke();
+    txt('總計',P+20,fy+RH/2,{s:18,w:700,c:C.muted});
+    for(let i=0;i<ng;i++){const s=rows.reduce((a,[,o])=>a+(o.cells[i]?o.cells[i].v:0),0);txt(mtxt(s),gx(i),fy+RH/2,{s:19,w:600,f:N,c:C.muted,a:'right'})}
+    const st=rows.reduce((a,[,o])=>a+o.tot,0); txt(mtxt(st),tx,fy+RH/2,{s:22,w:700,f:N,c:C.muted,a:'right'});
+    y+=bh;
+    if(k==='turkey'){y+=10;TL.forEach(s=>{txt(s,P+4,y+15,{s:16,c:C.gold,w:700});y+=30})}
+    y+=30;
   });
-  y+=RH*(rows.length+1)+40;
   // games
-  const G={n:P+20,tm:200,s:330,h:405,k:480,p:560,m:W-P-20};
+  const G={n:P+20,tm:185,s:290,h:355,hi:420,k:485,p:565,m:W-P-20};
   games.forEach(({g,r,ns},gi)=>{
     const win=r.loser?(r.loser==='A'?'乙隊勝':'甲隊勝'):'平手';
     txt(`第 ${gi+1} 局`,P+4,y+20,{s:24,w:900});
     txt(`甲 ${r.A} : ${r.B} 乙　${win}`,W-P-4,y+20,{s:22,w:700,a:'right'});
     y+=44;
     const bh=GRH*(ns.length+1); card(y,bh);
-    [['人',G.n,'left'],['隊',G.tm,'center'],['分數',G.s,'right'],['讓分',G.h,'right'],['火雞',G.k,'right'],['個人',G.p,'center'],['本局',G.m,'right']].forEach(([s,x,a])=>txt(s,x,y+GRH/2,{s:16,c:C.muted,a}));
+    [['人',G.n,'left'],['隊',G.tm,'center'],['分數',G.s,'right'],['團讓',G.h,'right'],['個讓',G.hi,'right'],['火雞',G.k,'right'],['個人',G.p,'center'],['本局',G.m,'right']].forEach(([s,x,a])=>txt(s,x,y+GRH/2,{s:16,c:C.muted,a}));
     c.strokeStyle=C.line;c.beginPath();c.moveTo(P,y+GRH);c.lineTo(W-P,y+GRH);c.stroke();
     ns.forEach((n,i)=>{const yy=y+GRH*(i+1), s=g.scores[n], tm=g.teams[n];
       if(i%2){c.fillStyle=C.stripe;c.fillRect(P+1,yy,W-2*P-2,GRH)}
-      txt(n,G.n,yy+GRH/2,{s:20,w:700});
+      txt(n,G.n,yy+GRH/2,{s:20,w:700}); if(s.nc){c.font=`700 20px ${F}`;txt('不計',G.n+c.measureText(n).width+6,yy+GRH/2,{s:13,w:700,c:C.red})}
       c.fillStyle=tm==='A'?C.As:C.Bs;c.beginPath();c.roundRect?c.roundRect(G.tm-26,yy+8,52,GRH-16,6):c.rect(G.tm-26,yy+8,52,GRH-16);c.fill();
       txt(TEAM[tm],G.tm,yy+GRH/2,{s:15,w:700,c:tm==='A'?C.blue:C.red,a:'center'});
       txt(String(+s.s||0),G.s,yy+GRH/2,{s:24,w:700,f:N,a:'right'});
       const hc=+s.h||0; txt(hc?(hc>0?'+':'')+hc:'—',G.h,yy+GRH/2,{s:22,w:600,f:N,c:hc?C.ink:C.muted,a:'right'});
-      const tk=g.indiv[n]?(+s.t||0):null; txt(tk==null?'—':String(tk),G.k,yy+GRH/2,{s:22,w:600,f:N,c:tk>=3?C.gold:C.muted,a:'right'});
+      const hi=g.indiv[n]&&g.v>=2?(+s.hi||0):null; txt(hi==null?'—':(hi>0?'+':'')+hi,G.hi,yy+GRH/2,{s:22,w:600,f:N,c:hi?C.ink:C.muted,a:'right'});
+      const tk=inT(g,n)?(+s.t||0):null; txt(tk==null?'—':String(tk),G.k,yy+GRH/2,{s:22,w:600,f:N,c:tk>=3?C.gold:C.muted,a:'right'});
       const pl=r.place[n]; txt(pl||'—',G.p,yy+GRH/2,{s:17,w:700,c:pl==='贏'?C.blue:pl==='輸'?C.red:C.muted,a:'center'});
       const v=sumD(r.d[n]); txt((r.bingo[n]?'🎯 ':'')+mtxt(v),G.m,yy+GRH/2,{s:24,w:700,f:N,c:mcol(v),a:'right'});
     });
@@ -417,20 +487,23 @@ document.addEventListener('click',e=>{
   const n=b.dataset.n, i=+b.dataset.i, c=S.cur;
   switch(b.dataset.act){
     case 'present': S.present[n]=!S.present[n]; if(S.present[n]&&S.hcp[n]==null)S.hcp[n]=0; break;
-    case 'add': {const v=document.getElementById('newName').value.trim(); if(v&&!S.roster.includes(v)){S.roster.push(v);S.present[v]=true;S.hcp[v]=0} break;}
+    case 'add': {const v=document.getElementById('newName').value.trim(); if(v&&!S.roster.includes(v)){S.roster.push(v);S.present[v]=true;S.hcp[v]=0;S.hcpI[v]=0} break;}
     case 'tab': S.tab=b.dataset.t; break;
     case 'pick': if(!c.pick)c.pick=n; else if(c.pick===n)c.pick=null; else {c.pairs.push([c.pick,n,null]);c.pick=null} break;
     case 'win': c.pairs[i][2]=n; break;
     case 'unpair': c.pairs.splice(i,1); break;
     case 'solo': c.solo[n]=b.dataset.v; break;
-    case 'clearpairs': c.pairs=[];c.solo={};c.pick=null; break;
+    case 'clearpairs': c.pairs=[];c.solo={};c.pick=null;c.manual={}; break;
+    case 'billtab': S.billTab=b.dataset.v; break;
+    case 'mode': c.mode=b.dataset.v; break;
+    case 'man': (c.manual=c.manual||{})[n]=b.dataset.v; break;
     case 'random': {const a=present().sort(()=>Math.random()-.5); c.pairs=[];c.solo={};c.pick=null;
       for(let k=0;k+1<a.length;k+=2)c.pairs.push([a[k],a[k+1],Math.random()<.5?a[k]:a[k+1]]);
       if(a.length%2)c.solo[a[a.length-1]]=Math.random()<.5?'A':'B'; break;}
-    case 'save': {const g=curGame(); S.games.push(JSON.parse(JSON.stringify(g))); S.cur={pairs:[],solo:{},scores:{},pick:null}; S.tab='bill'; window.scrollTo(0,0); break;}
+    case 'save': {const g=curGame(); S.games.push(JSON.parse(JSON.stringify(g))); S.cur=newCur(); S.tab='bill'; window.scrollTo(0,0); break;}
     case 'delgame': ask(`確定刪除第 ${i+1} 局？`,()=>{S.games.splice(i,1);render()}); return;
-    case 'reset': ask('確定清空所有局數紀錄？',()=>{S.games=[];S.cur={pairs:[],solo:{},scores:{},pick:null};S.date=today();render()}); return;
-    case 'next': S.cur={pairs:[],solo:{},scores:{},pick:null}; S.tab='game'; window.scrollTo(0,0); break;
+    case 'reset': ask('確定清空所有局數紀錄？',()=>{S.games=[];S.cur=newCur();S.date=today();render()}); return;
+    case 'next': S.cur=newCur(); S.tab='game'; window.scrollTo(0,0); break;
     case 'img': {b.disabled=true;b.textContent='產生中…';
       drawImage().then(async cv=>{const out=document.getElementById('imgOut');
         out.innerHTML=`<img alt="結算表" src="${cv.toDataURL('image/png')}"><div class="btns"><button class="btn line" id="shareImg">分享 / 儲存圖片</button></div><p class="hint" id="shareHint" style="margin-top:8px">按下後選 LINE 傳到群組，或選「儲存影像」存到相簿。</p>`;
@@ -461,8 +534,12 @@ document.addEventListener('input',e=>{
   if(k==='bingoHcp'){S.bingoHcp=el.checked;save();return}
   if(k==='hcp'){S.hcp[n]=+el.value||0; save(); return}
   if(k==='indiv'){S.indiv[n]=el.checked; save(); return}
-  if(k==='useHcp'){S.useHcpIndiv=el.checked; save(); return}
-  const s=S.cur.scores[n]||(S.cur.scores[n]={s:'',h:S.hcp[n]||0,t:0});
+  if(k==='noCount'){S.noCount[n]=el.checked; save(); return}
+  if(k==='nc'){const s=S.cur.scores[n]||(S.cur.scores[n]={s:'',h:S.hcp[n]||0,hi:S.hcpI[n]||0,t:0});s.nc=el.checked;
+    const tg=document.querySelector(`[data-nc="${CSS.escape(n)}"]`);if(tg)tg.classList.toggle('hide',!el.checked); refreshLive(); return}
+  if(k==='hcpI'){S.hcpI[n]=+el.value||0; save(); return}
+  if(k==='turkeyP'){S.turkeyP[n]=el.checked; save(); return}
+  const s=S.cur.scores[n]||(S.cur.scores[n]={s:'',h:S.hcp[n]||0,hi:S.hcpI[n]||0,t:0});
   s[k]=el.value; refreshLive();
 });
 render();
