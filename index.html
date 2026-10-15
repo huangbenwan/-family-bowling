@@ -316,16 +316,35 @@ function vBill(){
   <textarea id="exp" readonly class="hide" aria-label="結算文字">${esc(exportText())}</textarea>
   <h2>各局紀錄</h2>`;
   h+=S.games.map((g,i)=>{const r=compute(g);const ns=Object.keys(g.teams);
+    if(S.editGame===i) return editGameHtml(g,i,r);
     return `<details class="box game"><summary><span>第 ${i+1} 局</span><span>甲 ${r.A} : ${r.B} 乙　${r.loser?TEAM[r.loser==='A'?'B':'A']+'勝':'平手'}</span></summary>
     <div class="scroll"><table style="margin-top:8px"><thead><tr><th>人</th><th>隊</th><th>分數</th><th>團讓</th><th>個讓</th><th>火雞</th><th>個人</th><th>本局</th></tr></thead><tbody>
     ${ns.map(n=>{const s=g.scores[n];return `<tr><td>${esc(n)}</td><td><span class="tag ${g.teams[n]}" style="margin:0">${TEAM[g.teams[n]]}</span></td><td>${+s.s||0}${s.nc?'<br><span class="hint" style="font-size:12px">不計分</span>':''}</td><td>${+s.h||0}</td><td>${g.indiv[n]&&g.v>=2?(+s.hi||0):'—'}</td><td>${inT(g,n)?(+s.t||0):'—'}</td><td>${r.place[n]||'—'}</td><td>${r.bingo[n]?'🎯 ':''}${money(sumD(r.d[n]))}</td></tr>`}).join('')}
     </tbody></table></div>
     ${r.tlog.map(x=>`<p class="hint" style="margin:8px 0 0">${esc(tlogLine(x))}</p>`).join('')}
     ${Object.keys(r.bingo).length?`<p class="hint" style="margin-top:8px">🎯 賓果：${Object.keys(r.bingo).map(esc).join('、')}</p>`:''}
-    <div class="btns"><button class="btn warn" data-act="delgame" data-i="${i}">刪除這局</button></div></details>`}).join('');
+    <div class="btns"><button class="btn" data-act="editgame" data-i="${i}">修改這局</button><button class="btn warn" data-act="delgame" data-i="${i}">刪除這局</button></div></details>`}).join('');
   return h;
 }
 
+function editGameHtml(g,i,r){
+  const ns=Object.keys(g.teams);
+  const f=(n,k,v,lab)=>`<label class="sm">${lab} <input type="number" inputmode="numeric" data-eg="${i}" data-k="${k}" data-n="${esc(n)}" value="${esc(v)}"></label>`;
+  return `<div class="box game" id="editBox" style="border:2px solid var(--gold)">
+    <div style="display:flex;justify-content:space-between;font-weight:700"><span>修改第 ${i+1} 局</span><span>甲 ${r.A} : ${r.B} 乙</span></div>
+    <p class="hint" style="margin:4px 0 0">改完每一格，金額會自動重算。可以改分數、讓分、火雞、隊伍。</p>
+    ${ns.map(n=>{const s=g.scores[n];return `<div class="score">
+      <div class="top"><span class="nm">${esc(n)}</span>
+        <span class="seg"><button class="${g.teams[n]==='A'?'on':''}" data-act="egteam" data-i="${i}" data-n="${esc(n)}" data-v="A">甲隊</button><button class="${g.teams[n]==='B'?'on':''}" data-act="egteam" data-i="${i}" data-n="${esc(n)}" data-v="B">乙隊</button></span></div>
+      <div class="fields">
+        ${f(n,'s',s.s,'分數')}${f(n,'h',+s.h||0,'團體讓分')}
+        ${g.indiv[n]&&g.v>=2?f(n,'hi',+s.hi||0,'個人讓分'):''}
+        ${inT(g,n)?f(n,'t',+s.t||0,'火雞'):''}
+        <label class="sm">不計分 <input type="checkbox" class="tog" data-eg="${i}" data-k="nc" data-n="${esc(n)}" ${s.nc?'checked':''}></label>
+      </div></div>`}).join('')}
+    <div class="btns"><button class="btn" data-act="editdone">完成修改</button></div>
+  </div>`;
+}
 const tlogLine=x=>`🦃 ${x.to} ${x.k} 火雞：${x.from.join('、')} 各給 $${x.amt}（共收 $${x.amt*x.from.length}）`;
 function tlogHtml(){
   const L=[];S.games.forEach((g,i)=>compute(g).tlog.forEach(x=>L.push([i,x])));
@@ -494,6 +513,9 @@ document.addEventListener('click',e=>{
     case 'unpair': c.pairs.splice(i,1); break;
     case 'solo': c.solo[n]=b.dataset.v; break;
     case 'clearpairs': c.pairs=[];c.solo={};c.pick=null;c.manual={}; break;
+    case 'editgame': S.editGame=i; render(); setTimeout(()=>{const e=document.getElementById('editBox');if(e)e.scrollIntoView({block:'start'})},0); return;
+    case 'editdone': S.editGame=null; break;
+    case 'egteam': S.games[i].teams[n]=b.dataset.v; break;
     case 'billtab': S.billTab=b.dataset.v; break;
     case 'mode': c.mode=b.dataset.v; break;
     case 'man': (c.manual=c.manual||{})[n]=b.dataset.v; break;
@@ -508,7 +530,7 @@ document.addEventListener('click',e=>{
     case 'save': {const g=curGame(); S.games.push(JSON.parse(JSON.stringify(g))); S.cur=newCur(); S.tab='bill'; window.scrollTo(0,0); break;}
     case 'delgame': ask(`確定刪除第 ${i+1} 局？`,()=>{S.games.splice(i,1);render()}); return;
     case 'reset': ask('確定清空所有局數紀錄？',()=>{S.games=[];S.cur=newCur();S.date=today();render()}); return;
-    case 'next': S.cur=newCur(); S.tab='game'; window.scrollTo(0,0); break;
+    case 'next': S.editGame=null; S.cur=newCur(); S.tab='game'; window.scrollTo(0,0); break;
     case 'img': {b.disabled=true;b.textContent='產生中…';
       drawImage().then(async cv=>{const out=document.getElementById('imgOut');
         out.innerHTML=`<img alt="結算表" src="${cv.toDataURL('image/png')}"><div class="btns"><button class="btn line" id="shareImg">分享 / 儲存圖片</button></div><p class="hint" id="shareHint" style="margin-top:8px">按下後選 LINE 傳到群組，或選「儲存影像」存到相簿。</p>`;
@@ -532,7 +554,14 @@ document.addEventListener('click',e=>{
   }
   render();
 });
+document.addEventListener('change',e=>{
+  const el=e.target; if(el.dataset.eg==null)return;
+  const g=S.games[+el.dataset.eg]; if(!g)return; const s=g.scores[el.dataset.n]; const k=el.dataset.k;
+  if(k==='nc')s.nc=el.checked; else s[k]=k==='s'?el.value:(+el.value||0);
+  render();
+});
 document.addEventListener('input',e=>{
+  if(e.target.dataset.eg!=null)return;
   const el=e.target, k=el.dataset.in, n=el.dataset.n; if(!k)return;
   if(k==='date'){S.date=el.value;save();document.getElementById('gcount').textContent=fmtDate(S.date)+(S.games.length?`　已打 ${S.games.length} 局`:'');return}
   if(k==='bingo'){S.bingo[+el.dataset.i]=el.value;save();return}
