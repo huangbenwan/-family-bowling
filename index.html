@@ -157,6 +157,19 @@ const money=n=>{n=Math.round(n);return n>0?`<span class="money pos">+$${n}</span
 const TEAM={A:'甲隊',B:'乙隊'};
 
 /* ---------- team assignment from pairs ---------- */
+// 依上一局實際分數排名：第1對第2、第3對第4…，奇數時最後一名落單
+function rankOrder(){
+  const g=S.games[S.games.length-1]; if(!g)return null;
+  const p=present(), sc=n=>g.scores[n]&&g.scores[n].s!==''?+g.scores[n].s:-1;
+  const inG=p.filter(n=>g.teams[n]).sort((a,b)=>sc(b)-sc(a)), notG=p.filter(n=>!g.teams[n]);
+  return inG.concat(notG);
+}
+function rankPairs(){
+  const o=rankOrder(); if(!o)return null; const pr=[];
+  for(let k=0;k+1<o.length;k+=2)pr.push([o[k],o[k+1]]);
+  return {pairs:pr,solo:o.length%2?o[o.length-1]:null};
+}
+function applyRankPairs(c){const r=rankPairs(); if(!r)return false; c.pairs=r.pairs.map(x=>[x[0],x[1],null]); c.solo={}; c.pick=null; c.mode='rps'; return true}
 function newCur(){return {pairs:[],solo:{},scores:{},pick:null,mode:(S.cur&&S.cur.mode)||'rps',manual:{}}}
 const inT=(g,n)=>g.turkeyP?!!g.turkeyP[n]:!!g.indiv[n];
 function teamsOf(){
@@ -255,7 +268,7 @@ function vGame(){
   <div class="box">${p.map(n=>`<div class="pair"><span class="nm" style="flex:1">${esc(n)}</span>
     <span class="seg"><button class="${t[n]==='A'?'on':''}" data-act="man" data-n="${esc(n)}" data-v="A">甲隊</button><button class="${t[n]==='B'?'on':''}" data-act="man" data-n="${esc(n)}" data-v="B">乙隊</button></span></div>`).join('')}</div>
   <div class="btns"><button class="btn ghost" data-act="clearpairs">重新分組</button></div>`; }
-  else h+=`<p class="hint">依序點兩個人配成一對猜拳，再點贏的那位。猜拳贏的進甲隊、輸的進乙隊。「幫我隨機猜拳」只會替還沒分輸贏的組別決定，已經配好的組合和落單的人不會變。</p>
+  else h+=`<p class="hint">依序點兩個人配成一對猜拳，再點贏的那位。從第 2 局開始，按「下一局」會自動依上一局名次配好（第 1 對第 2、第 3 對第 4…），真人猜拳後點贏的人就好。猜拳贏的進甲隊、輸的進乙隊。「幫我隨機猜拳」只會替還沒分輸贏的組別決定，已經配好的組合和落單的人不會變。</p>
   <div class="chips">${free.length===1?'<span class="hint">配對完成，落單的人請在下方選隊。</span>':free.map(n=>`<button class="chip ${S.cur.pick===n?'sel':''}" data-act="pick" data-n="${esc(n)}">${esc(n)}</button>`).join('')||'<span class="hint">全員都配好了</span>'}</div>
   <div class="box" style="margin-top:10px">${S.cur.pairs.length?S.cur.pairs.map((pr,i)=>`
     <div class="pair">
@@ -267,7 +280,7 @@ function vGame(){
     ${free.length===1?`<div class="pair" style="flex-wrap:wrap;${S.cur.solo[free[0]]?'':'background:var(--goldsoft);margin:6px -6px 0;padding:10px 6px;border-radius:10px'}"><span style="flex:1;min-width:150px"><span class="nm">${esc(free[0])}</span>（落單）<br><span class="hint" style="font-size:13px">${S.cur.solo[free[0]]?'已加入'+TEAM[S.cur.solo[free[0]]]+'，可以再改':'自己選要加入哪一隊'}</span></span>
       <span class="seg"><button class="${S.cur.solo[free[0]]==='A'?'on':''}" data-act="solo" data-n="${esc(free[0])}" data-v="A">甲隊</button><button class="${S.cur.solo[free[0]]==='B'?'on':''}" data-act="solo" data-n="${esc(free[0])}" data-v="B">乙隊</button></span></div>`:''}
   </div>
-  <div class="btns"><button class="btn ghost" data-act="random">幫我隨機猜拳</button><button class="btn ghost" data-act="clearpairs">重新分組</button></div>`;
+  <div class="btns">${S.games.length?'<button class="btn ghost" data-act="rankpair">依上一局名次配對</button>':''}<button class="btn ghost" data-act="random">幫我隨機猜拳</button><button class="btn ghost" data-act="clearpairs">重新分組</button></div>`;
   if(!ready){ return h+`<p class="hint" style="margin-top:14px">每個人都分好隊後，下面會出現輸入分數。</p>`; }
   const g=curGame(), r=compute(g);
   const mem=k=>p.filter(n=>t[n]===k).map(esc).join('、');
@@ -297,7 +310,13 @@ function teamCards(r,mem){
 function vBill(){
   if(!S.games.length) return `<div class="empty">${fmtDate(S.date)}<br>還沒有儲存任何一局。打完第一局後在「本局」按儲存。</div>`;
   const bt=S.billTab||'team';
-  let h=`<div class="btns"><button class="btn" data-act="next">下一局（第 ${S.games.length+1} 局）</button></div>
+  const rp=rankPairs(), lg=S.games[S.games.length-1];
+  let h=`${rp&&rp.pairs.length?`<h2>下一局猜拳配對</h2>
+  <p class="hint">依第 ${S.games.length} 局實際分數排名，第 1 名對第 2 名、第 3 名對第 4 名，以此類推。</p>
+  <div class="box">${rp.pairs.map(([a,b],i)=>{const s=n=>lg.teams[n]?`<span class="hint" style="margin:0">${+lg.scores[n].s||0}</span>`:'<span class="hint" style="margin:0">沒打</span>';
+    return `<div class="pair"><span class="vs" style="white-space:nowrap;min-width:54px">第 ${i*2+1}–${i*2+2} 名</span><span class="nm" style="flex:1;text-align:right">${esc(a)} ${s(a)}</span><span class="vs">VS</span><span class="nm" style="flex:1">${esc(b)} ${s(b)}</span></div>`}).join('')}
+    ${rp.solo?`<div class="pair"><span class="nm">${esc(rp.solo)}</span>（落單，自己選隊）</div>`:''}</div>`:''}
+  <div class="btns"><button class="btn" data-act="next">下一局（第 ${S.games.length+1} 局）</button></div>
   <h2>${fmtDate(S.date)}　共 ${S.games.length} 局</h2>
   <p class="hint">三種賽各自結算。負數是要付出去的錢，正數是可以收的錢。</p>
   <div class="seg" style="margin:4px 0 10px;display:flex">${Object.entries(KIND).map(([k,l])=>`<button style="flex:1" class="${bt===k?'on':''}" data-act="billtab" data-v="${k}">${l}</button>`).join('')}</div>
@@ -531,6 +550,7 @@ document.addEventListener('click',e=>{
     case 'editdone': S.editGame=null; break;
     case 'egteam': S.games[i].teams[n]=b.dataset.v; break;
     case 'clearbingo': ask('確定清空所有賓果數字？',()=>{S.bingo=Array(12).fill('');render()}); return;
+    case 'rankpair': applyRankPairs(c); break;
     case 'billtab': S.billTab=b.dataset.v; break;
     case 'mode': c.mode=b.dataset.v; break;
     case 'man': (c.manual=c.manual||{})[n]=b.dataset.v; break;
@@ -545,7 +565,7 @@ document.addEventListener('click',e=>{
     case 'save': {const g=curGame(); S.games.push(JSON.parse(JSON.stringify(g))); S.cur=newCur(); S.tab='bill'; window.scrollTo(0,0); break;}
     case 'delgame': ask(`確定刪除第 ${i+1} 局？`,()=>{S.games.splice(i,1);render()}); return;
     case 'reset': ask('確定清空所有局數紀錄？',()=>{S.games=[];S.cur=newCur();S.date=today();render()}); return;
-    case 'next': S.editGame=null; S.cur=newCur(); S.tab='game'; window.scrollTo(0,0); break;
+    case 'next': S.editGame=null; S.cur=newCur(); if(S.cur.mode==='rps')applyRankPairs(S.cur); S.tab='game'; window.scrollTo(0,0); break;
     case 'img': {b.disabled=true;b.textContent='產生中…';
       drawImage().then(async cv=>{const out=document.getElementById('imgOut');
         out.innerHTML=`<img alt="結算表" src="${cv.toDataURL('image/png')}"><div class="btns"><button class="btn line" id="shareImg">分享 / 儲存圖片</button></div><p class="hint" id="shareHint" style="margin-top:8px">按下後選 LINE 傳到群組，或選「儲存影像」存到相簿。</p>`;
