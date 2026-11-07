@@ -125,12 +125,12 @@ input[type=date]{font:600 17px var(--f);padding:6px 10px;border:1.5px solid var(
 .chip.boy.on{background:var(--boy);border-color:var(--boy);color:#fff}
 .chip.girl.on{background:var(--girl);border-color:var(--girl);color:#fff}
 .recs{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.rec{display:flex;gap:10px;align-items:flex-start;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px}
-.rec .ic{font-size:24px;line-height:1.2}
-.rec .rt{font-size:13px;color:var(--muted);display:block}
-.rec .rv{font-weight:700;margin-top:2px}
-.rec .rv b{font:700 20px var(--num);color:var(--ink);white-space:nowrap}
-@media (max-width:420px){.recs{grid-template-columns:1fr}}
+.recs .rh{font-weight:900;font-size:15px;text-align:center;padding:6px;border-radius:10px;background:var(--ink);color:var(--paper)}
+.rec{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:9px 10px;min-width:0}
+.rec .ic{font-size:18px;margin-right:4px;vertical-align:-2px}
+.rec .rt{font-size:12.5px;color:var(--muted);display:block;line-height:1.4}
+.rec .rv{font-weight:700;margin-top:4px;line-height:1.35;word-break:break-word}
+.rec .rv b{font:700 22px var(--num);color:var(--ink);white-space:nowrap}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
@@ -585,17 +585,21 @@ function vCareerTeam(){
   let h=`<p class="hint">共 ${days} 天的紀錄（${S.history.length} 天已存${S.games.length?'＋今天':''}）。點名字看個人紀錄。</p>
   <div class="chips"><button class="chip ${who?'':'on'}" data-act="who" data-n="">排行榜</button>${S.roster.filter(n=>P[n]).concat(names.filter(n=>!S.roster.includes(n))).map(n=>`<button class="chip ${isMale(n)?'boy':'girl'} ${who===n?'on':''}" data-act="who" data-n="${esc(n)}">${esc(n)}</button>`).join('')}</div>`;
   if(!who){
-    // 六項紀錄（同分的人都列出）
-    const top=(male,key,fmt)=>{const L=names.filter(n=>isMale(n)===male&&P[n][key]>0); if(!L.length)return null;
-      const v=Math.max(...L.map(n=>P[n][key])); return {who:L.filter(n=>P[n][key]===v),val:fmt(v)}};
-    const REC=[
-      ['🏆','男生目前最高紀錄',top(true,'best',v=>v+' 分')],
-      ['👑','女生目前最高紀錄',top(false,'best',v=>v+' 分')],
-      ['📊','男生目前平均最高紀錄',top(true,'avg',v=>v.toFixed(1)+' 分')],
-      ['📈','女生目前平均最高紀錄',top(false,'avg',v=>v.toFixed(1)+' 分')],
-      ['🦃','男生目前連續火雞最高紀錄',top(true,'tkBest',v=>v+' 支')],
-      ['🐔','女生目前連續火雞最高紀錄',top(false,'tkBest',v=>v+' 支')]];
-    h+=`<h2>目前紀錄</h2><div class="recs">${REC.map(([ic,t,r])=>`<div class="rec"><span class="ic" aria-hidden="true">${ic}</span><div><span class="rt">${t}</span><div class="rv">${r?`${r.who.map(nm).join('、')}　<b>${r.val}</b>`:'<span class="hint" style="margin:0">還沒有紀錄</span>'}</div></div></div>`).join('')}</div>`;
+    // 目前紀錄：左邊團體賽、右邊個人偷練，各分男女（同分的人都列出）
+    const Q=prStats();
+    const top=(D,male,key,fmt)=>{const L=Object.keys(D).filter(n=>isMale(n)===male&&D[n][key]>0); if(!L.length)return null;
+      const v=Math.max(...L.map(n=>D[n][key])); return {who:L.filter(n=>D[n][key]===v),val:fmt(v)}};
+    const pt=v=>v+' 分', av=v=>v.toFixed(1)+' 分', tk=v=>v+' 支';
+    const ROWS=[
+      ['🏆','男生目前最高紀錄',true,'best',pt],
+      ['👑','女生目前最高紀錄',false,'best',pt],
+      ['📊','男生目前平均最高紀錄',true,'avg',av],
+      ['📈','女生目前平均最高紀錄',false,'avg',av],
+      ['🦃','男生目前連續火雞最高紀錄',true,'tkBest',tk],
+      ['🐔','女生目前連續火雞最高紀錄',false,'tkBest',tk]];
+    const card=(ic,t,r)=>`<div class="rec"><span class="rt"><span class="ic" aria-hidden="true">${ic}</span>${t}</span><div class="rv">${r?`${r.who.map(nm).join('、')}<br><b>${r.val}</b>`:'<span class="hint" style="margin:0;font-weight:400">還沒有紀錄</span>'}</div></div>`;
+    h+=`<h2>目前紀錄</h2><div class="recs"><div class="rh">團體賽</div><div class="rh">個人偷練</div>
+      ${ROWS.map(([ic,t,m,k,f])=>card(ic,t,top(P,m,k,f))+card(ic,t,top(Q,m,k,f))).join('')}</div>`;
     const rows=names.map(n=>[n,P[n]]).sort((a,b)=>b[1].avg-a[1].avg);
     h+=`<h2>排行榜</h2><p class="hint">依平均分排序。</p>
     <div class="box scroll"><table class="mx lb"><thead><tr><th>人</th><th>局數</th><th>平均</th><th>生涯最高分</th><th>連續火雞</th></tr></thead><tbody>
