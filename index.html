@@ -124,7 +124,19 @@ input[type=date]{font:600 17px var(--f);padding:6px 10px;border:1.5px solid var(
 .chip.boy,.chip.girl{font-weight:700}
 .chip.boy.on{background:var(--boy);border-color:var(--boy);color:#fff}
 .chip.girl.on{background:var(--girl);border-color:var(--girl);color:#fff}
-.recs{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.recs{display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:start}
+.rcol{display:flex;flex-direction:column;gap:8px;min-width:0}
+.tkline{margin-top:8px;padding-top:7px;border-top:1px dashed var(--line);font-size:13px;font-weight:700;line-height:1.45}
+.tkline b{font:700 17px var(--num);color:var(--ink)}
+.lbbar{display:flex;align-items:center;gap:10px;width:100%;border:1.5px solid var(--ink);background:var(--card);color:var(--ink);border-radius:10px;padding:9px 16px;font:700 18px var(--f);cursor:pointer;text-align:left}
+.lbbar span:first-child{font-size:22px}
+.lbbar span:last-child{font-size:22px;font-weight:500}
+.lbbar.on{background:var(--ink);color:var(--paper)}
+.mgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.mbtn{border:1.5px solid var(--line);background:var(--card);border-radius:10px;padding:9px 4px;font:700 17px var(--f);cursor:pointer;min-height:46px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mbtn.boy{color:var(--boy)}.mbtn.girl{color:var(--girl)}
+.mbtn.boy.on{background:var(--boy);border-color:var(--boy);color:#fff}
+.mbtn.girl.on{background:var(--girl);border-color:var(--girl);color:#fff}
 .recs .rh{font-weight:900;font-size:15px;text-align:center;padding:6px;border-radius:10px;background:var(--ink);color:var(--paper)}
 .rec{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:9px 10px;min-width:0}
 .rec .ic{font-size:18px;margin-right:4px;vertical-align:-2px}
@@ -571,6 +583,11 @@ function spark(games){
 const MALE=['軍','WD瀧','WD','俊儀','宏進','見雄','川平','川豪'];
 const isMale=n=>MALE.includes(n);
 const nm=n=>`<span class="${isMale(n)?'boy':'girl'}">${esc(n)}</span>`;
+function picker(label,names,who){
+  return `<button class="lbbar ${who?'':'on'}" data-act="who" data-n=""><span aria-hidden="true">🏆</span><span style="flex:1">${label}</span><span aria-hidden="true">›</span></button>
+  <p class="hint" style="margin:12px 0 6px">選擇成員</p>
+  <div class="mgrid">${names.map(n=>`<button class="mbtn ${isMale(n)?'boy':'girl'} ${who===n?'on':''}" data-act="who" data-n="${esc(n)}">${esc(n)}</button>`).join('')}</div>`;
+}
 function vCareer(){
   const cv=S.careerView==='practice'?'practice':'team';
   const seg=`<h2>生涯紀錄</h2><div class="seg" style="display:flex;margin:4px 0 12px"><button style="flex:1" class="${cv==='team'?'on':''}" data-act="cview" data-v="team">團體賽紀錄</button><button style="flex:1" class="${cv==='practice'?'on':''}" data-act="cview" data-v="practice">個人偷練</button></div>`;
@@ -582,24 +599,22 @@ function vCareerTeam(){
   if(!names.length) return `<div class="empty">還沒有任何團體賽紀錄。打完一局並儲存後，這裡就會開始累積。</div>`;
   const who=S.careerWho&&P[S.careerWho]?S.careerWho:null;
   const days=sessions().length;
-  let h=`<p class="hint">共 ${days} 天的紀錄（${S.history.length} 天已存${S.games.length?'＋今天':''}）。點名字看個人紀錄。</p>
-  <div class="chips"><button class="chip ${who?'':'on'}" data-act="who" data-n="">排行榜</button>${S.roster.filter(n=>P[n]).concat(names.filter(n=>!S.roster.includes(n))).map(n=>`<button class="chip ${isMale(n)?'boy':'girl'} ${who===n?'on':''}" data-act="who" data-n="${esc(n)}">${esc(n)}</button>`).join('')}</div>`;
+  let h=`<p class="hint">已儲存 ${S.history.length} 天紀錄${S.games.length?'，加上今天':''}。</p>
+  ${picker('排行榜',S.roster.filter(n=>P[n]).concat(names.filter(n=>!S.roster.includes(n))),who)}`;
   if(!who){
     // 目前紀錄：左邊團體賽、右邊個人偷練，各分男女（同分的人都列出）
     const Q=prStats();
     const top=(D,male,key,fmt)=>{const L=Object.keys(D).filter(n=>isMale(n)===male&&D[n][key]>0); if(!L.length)return null;
       const v=Math.max(...L.map(n=>D[n][key])); return {who:L.filter(n=>D[n][key]===v),val:fmt(v)}};
     const pt=v=>v+' 分', av=v=>v.toFixed(1)+' 分', tk=v=>v+' 支';
-    const ROWS=[
-      ['🏆','男生目前最高紀錄',true,'best',pt],
-      ['👑','女生目前最高紀錄',false,'best',pt],
-      ['📊','男生目前平均最高紀錄',true,'avg',av],
-      ['📈','女生目前平均最高紀錄',false,'avg',av],
-      ['🦃','男生目前連續火雞最高紀錄',true,'tkBest',tk],
-      ['🐔','女生目前連續火雞最高紀錄',false,'tkBest',tk]];
-    const card=(ic,t,r)=>`<div class="rec"><span class="rt"><span class="ic" aria-hidden="true">${ic}</span>${t}</span><div class="rv">${r?`${r.who.map(nm).join('、')}<br><b>${r.val}</b>`:'<span class="hint" style="margin:0;font-weight:400">還沒有紀錄</span>'}</div></div>`;
-    h+=`<h2>目前紀錄</h2><div class="recs"><div class="rh">團體賽</div><div class="rh">個人偷練</div>
-      ${ROWS.map(([ic,t,m,k,f])=>card(ic,t,top(P,m,k,f))+card(ic,t,top(Q,m,k,f))).join('')}</div>`;
+    const who2=r=>r?`${r.who.map(nm).join('、')}<br><b>${r.val}</b>`:'<span class="hint" style="margin:0;font-weight:400">還沒有紀錄</span>';
+    const best=(D,m,ic,t)=>{const r=top(D,m,'best',pt), k=top(D,m,'tkBest',tk);
+      return `<div class="rec"><span class="rt"><span class="ic" aria-hidden="true">${ic}</span>${t}</span><div class="rv">${who2(r)}</div>
+        <div class="tkline"><span aria-hidden="true">🦃</span> ${k?`連續火雞 <b>${k.val}</b><br>${k.who.map(nm).join('、')}`:'<span class="hint" style="margin:0">還沒有火雞紀錄</span>'}</div></div>`};
+    const avgc=(D,m,ic,t)=>`<div class="rec"><span class="rt"><span class="ic" aria-hidden="true">${ic}</span>${t}</span><div class="rv">${who2(top(D,m,'avg',av))}</div></div>`;
+    h+=`<h2>目前紀錄</h2><div class="recs">
+      <div class="rcol"><div class="rh">團體賽</div>${best(P,true,'🏆','男生目前最高紀錄')}${best(P,false,'👑','女生目前最高紀錄')}${avgc(P,true,'📊','男生目前平均最高紀錄')}${avgc(P,false,'📈','女生目前平均最高紀錄')}</div>
+      <div class="rcol"><div class="rh">個人偷練</div>${best(Q,true,'🏆','男生目前最高紀錄')}${best(Q,false,'👑','女生目前最高紀錄')}</div></div>`;
     const rows=names.map(n=>[n,P[n]]).sort((a,b)=>b[1].avg-a[1].avg);
     h+=`<h2>排行榜</h2><p class="hint">依平均分排序。</p>
     <div class="box scroll"><table class="mx lb"><thead><tr><th>人</th><th>局數</th><th>平均</th><th>生涯最高分</th><th>連續火雞</th></tr></thead><tbody>
@@ -738,7 +753,7 @@ function vPractice(){
   const P=prStats(), who=S.careerWho;
   const names=S.roster.concat(Object.keys(P).filter(n=>!S.roster.includes(n)));
   let h=`<p class="hint">不是團體賽時自己練習的分數。偷練分數只算在這一頁，不會影響團體賽的平均、紀錄和輸贏。</p>
-  <div class="chips"><button class="chip ${who?'':'on'}" data-act="who" data-n="">偷練排行榜</button>${names.map(n=>`<button class="chip ${isMale(n)?'boy':'girl'} ${who===n?'on':''}" data-act="who" data-n="${esc(n)}">${esc(n)}</button>`).join('')}</div>`;
+  ${picker('偷練排行榜',names,who)}`;
   if(!who){
     const rows=Object.entries(P).sort((a,b)=>b[1].avg-a[1].avg);
     h+=`<h2>偷練排行榜</h2><p class="hint">點上面自己的名字，就能新增偷練分數。</p>`;
