@@ -9,17 +9,17 @@
 <style>
 :root{
   --paper:#E9F1EC; --card:#F7FBF8; --ink:#1B2A4A; --muted:#5B6B80; --line:#C6D6CD;
-  --red:#C8283C; --redsoft:#F6DCE0; --gold:#D99A1E; --goldsoft:#FBEBC8; --lane:#2E5E8C; --lanesoft:#DCE7F2;
+  --red:#C8283C; --redsoft:#F6DCE0; --boy:#1E5AA8; --girl:#C2185B; --gold:#D99A1E; --goldsoft:#FBEBC8; --lane:#2E5E8C; --lanesoft:#DCE7F2;
   --f:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
   --num:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
   box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
   --paper:#141C2B; --card:#1D2739; --ink:#E6ECF5; --muted:#9AA8BC; --line:#2F3C53;
-  --red:#F06A7B; --redsoft:#3C2129; --gold:#F2B940; --goldsoft:#3A2F17; --lane:#7FB0E0; --lanesoft:#1F3149;}}
+  --red:#F06A7B; --redsoft:#3C2129; --boy:#8AB8F0; --girl:#F48FB1; --gold:#F2B940; --goldsoft:#3A2F17; --lane:#7FB0E0; --lanesoft:#1F3149;}}
 :root[data-theme="dark"]{
   --paper:#141C2B; --card:#1D2739; --ink:#E6ECF5; --muted:#9AA8BC; --line:#2F3C53;
-  --red:#F06A7B; --redsoft:#3C2129; --gold:#F2B940; --goldsoft:#3A2F17; --lane:#7FB0E0; --lanesoft:#1F3149;}
+  --red:#F06A7B; --redsoft:#3C2129; --boy:#8AB8F0; --girl:#F48FB1; --gold:#F2B940; --goldsoft:#3A2F17; --lane:#7FB0E0; --lanesoft:#1F3149;}
 *,*::before,*::after{box-sizing:inherit}
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
 body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--f);font-size:16px;line-height:1.55}
@@ -117,6 +117,18 @@ input[type=date]{font:600 17px var(--f);padding:6px 10px;border:1.5px solid var(
 .lb td.nm button{all:unset;cursor:pointer;font-weight:700;text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:3px}
 .spark{width:100%;height:auto;display:block}
 @media (max-width:380px){.stats{grid-template-columns:repeat(2,1fr)}}
+.boy{color:var(--boy)}.girl{color:var(--girl)}
+.lb td.nm button.boy{color:var(--boy)}.lb td.nm button.girl{color:var(--girl)}
+.chip.boy,.chip.girl{font-weight:700}
+.chip.boy.on{background:var(--boy);border-color:var(--boy);color:#fff}
+.chip.girl.on{background:var(--girl);border-color:var(--girl);color:#fff}
+.recs{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.rec{display:flex;gap:10px;align-items:flex-start;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px}
+.rec .ic{font-size:24px;line-height:1.2}
+.rec .rt{font-size:13px;color:var(--muted);display:block}
+.rec .rv{font-weight:700;margin-top:2px}
+.rec .rv b{font:700 20px var(--num);color:var(--ink);white-space:nowrap}
+@media (max-width:420px){.recs{grid-template-columns:1fr}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
@@ -554,6 +566,9 @@ function spark(games){
     ${L.map((x,i)=>`<circle cx="${X(i)}" cy="${Y(x.s)}" r="4" fill="var(--card)" stroke="var(--lane)" stroke-width="2"/><text x="${X(i)}" y="${Y(x.s)-9}" text-anchor="middle" font-size="11" fill="var(--ink)">${x.s}</text>`).join('')}
   </svg><p class="hint" style="margin:2px 0 0">最近 ${L.length} 局分數，金色虛線是這幾局的平均 ${avg.toFixed(1)}</p>`;
 }
+const MALE=['軍','WD瀧','WD','俊儀','宏進','見雄','川平','川豪'];
+const isMale=n=>MALE.includes(n);
+const nm=n=>`<span class="${isMale(n)?'boy':'girl'}">${esc(n)}</span>`;
 function vCareer(){
   const P=career(), names=Object.keys(P);
   if(!names.length) return `<h2>生涯紀錄</h2><div class="empty">還沒有任何紀錄。打完一局並儲存後，這裡就會開始累積。</div>`;
@@ -561,12 +576,23 @@ function vCareer(){
   const days=sessions().length;
   let h=`<h2>生涯紀錄</h2>
   <p class="hint">共 ${days} 天的紀錄（${S.history.length} 天已存${S.games.length?'＋今天':''}）。點名字看個人紀錄。</p>
-  <div class="chips"><button class="chip ${who?'':'on'}" data-act="who" data-n="">排行榜</button>${S.roster.filter(n=>P[n]).concat(names.filter(n=>!S.roster.includes(n))).map(n=>`<button class="chip ${who===n?'on':''}" data-act="who" data-n="${esc(n)}">${esc(n)}</button>`).join('')}</div>`;
+  <div class="chips"><button class="chip ${who?'':'on'}" data-act="who" data-n="">排行榜</button>${S.roster.filter(n=>P[n]).concat(names.filter(n=>!S.roster.includes(n))).map(n=>`<button class="chip ${isMale(n)?'boy':'girl'} ${who===n?'on':''}" data-act="who" data-n="${esc(n)}">${esc(n)}</button>`).join('')}</div>`;
   if(!who){
+    // 六項紀錄（同分的人都列出）
+    const top=(male,key,fmt)=>{const L=names.filter(n=>isMale(n)===male&&P[n][key]>0); if(!L.length)return null;
+      const v=Math.max(...L.map(n=>P[n][key])); return {who:L.filter(n=>P[n][key]===v),val:fmt(v)}};
+    const REC=[
+      ['🏆','男生目前最高紀錄',top(true,'best',v=>v+' 分')],
+      ['👑','女生目前最高紀錄',top(false,'best',v=>v+' 分')],
+      ['📊','男生目前平均最高紀錄',top(true,'avg',v=>v.toFixed(1)+' 分')],
+      ['📈','女生目前平均最高紀錄',top(false,'avg',v=>v.toFixed(1)+' 分')],
+      ['🦃','男生目前連續火雞最高紀錄',top(true,'tkBest',v=>v+' 支')],
+      ['🐔','女生目前連續火雞最高紀錄',top(false,'tkBest',v=>v+' 支')]];
+    h+=`<h2>目前紀錄</h2><div class="recs">${REC.map(([ic,t,r])=>`<div class="rec"><span class="ic" aria-hidden="true">${ic}</span><div><span class="rt">${t}</span><div class="rv">${r?`${r.who.map(nm).join('、')}　<b>${r.val}</b>`:'<span class="hint" style="margin:0">還沒有紀錄</span>'}</div></div></div>`).join('')}</div>`;
     const rows=names.map(n=>[n,P[n]]).sort((a,b)=>b[1].avg-a[1].avg);
-    h+=`<h2>排行榜</h2><p class="hint">依平均分排序。合計是團體賽＋個人賽，火雞賽另列。</p>
-    <div class="box scroll"><table class="mx lb"><thead><tr><th>人</th><th>局數</th><th>平均</th><th>最高</th><th>合計</th><th>火雞賽</th><th>🎟️</th></tr></thead><tbody>
-    ${rows.map(([n,o])=>`<tr><td class="nm"><button data-act="who" data-n="${esc(n)}">${esc(n)}</button></td><td>${o.n}</td><td><b>${o.avg.toFixed(1)}</b></td><td>${o.best}</td><td>${money(o.team+o.indiv)}</td><td>${money(o.turkey)}</td><td>${o.cp||'—'}</td></tr>`).join('')}
+    h+=`<h2>排行榜</h2><p class="hint">依平均分排序。</p>
+    <div class="box scroll"><table class="mx lb"><thead><tr><th>人</th><th>局數</th><th>平均</th><th>生涯最高分</th><th>連續火雞</th></tr></thead><tbody>
+    ${rows.map(([n,o])=>`<tr><td class="nm"><button class="${isMale(n)?'boy':'girl'}" data-act="who" data-n="${esc(n)}">${esc(n)}</button></td><td>${o.n}</td><td><b>${o.avg.toFixed(1)}</b></td><td>${o.best}</td><td>${o.tkBest?o.tkBest+' 支':'—'}</td></tr>`).join('')}
     </tbody></table></div>`;
     if(S.history.length) h+=`<h2>已存的比賽日</h2><p class="hint">點日期打開，可以修改每一局的分數、讓分、火雞、隊伍，也能改日期。</p>${S.history.map((d,di)=>{const op=S.openDay===di;
       return `<div class="box game" ${op?'style="border:2px solid var(--line)"':''}><div class="pair" style="border:0;padding:0"><button class="who" style="text-align:left;flex:1;border:0;background:none;padding:4px 0" data-act="openday" data-i="${di}">${op?'▾':'▸'} ${fmtDate(d.date)}　<span class="hint" style="margin:0">${d.games.length} 局</span></button></div>
@@ -577,27 +603,24 @@ function vCareer(){
         <div class="btns"><button class="btn warn" data-act="delday" data-i="${di}">刪除這天</button></div>`:''}</div>`}).reverse().join('')}`;
     return h;
   }
-  const o=P[who], tot=o.team+o.indiv;
+  const o=P[who];
   const D=Object.values(o.days).reverse();
-  h+=`<h2>${esc(who)}</h2>
+  h+=`<h2>${nm(who)}</h2>
   <div class="stats">
     <div class="stat"><b>${o.n}</b><span>總局數（${D.length} 天）</span></div>
     <div class="stat"><b>${o.avg.toFixed(1)}</b><span>平均分</span></div>
-    <div class="stat"><b>${o.best}</b><span>最高分${o.bestAt?`<br>${fmtDate(o.bestAt.date)} 第${o.bestAt.g}局`:''}</span></div>
-    <div class="stat money"><b class="${tot>0?'pos':tot<0?'neg':'zero'}">${tot>0?'+':tot<0?'−':''}$${Math.abs(Math.round(tot))}</b><span>合計輸贏<br>（團體＋個人）</span></div>
-    <div class="stat money"><b class="${o.turkey>0?'pos':o.turkey<0?'neg':'zero'}">${o.turkey>0?'+':o.turkey<0?'−':''}$${Math.abs(Math.round(o.turkey))}</b><span>火雞賽輸贏</span></div>
-    <div class="stat"><b>${o.cp}</b><span>🎟️ 賓果優惠券</span></div>
+    <div class="stat"><b>${o.best}</b><span>生涯最高分${o.bestAt?`<br>${fmtDate(o.bestAt.date)} 第${o.bestAt.g}局`:''}</span></div>
   </div>
   <h2>分數走勢</h2><div class="box">${spark(o.games)||'<p class="hint" style="margin:0">打滿 2 局後會顯示走勢圖。</p>'}</div>
   <h2>各項成績</h2>
   <div class="box scroll"><table><tbody>
-    <tr><td>團體賽</td><td>${o.tw} 勝 ${o.tl} 敗${o.td?` ${o.td} 平`:''}</td><td>${money(o.team)}</td></tr>
-    <tr><td>個人賽</td><td>${o.ip?`參加 ${o.ip} 局，第一名 ${o.iw} 次`:'沒參加'}</td><td>${money(o.indiv)}</td></tr>
-    <tr><td>火雞賽</td><td>${o.tk?`打出 ${o.tk} 次，最多連續 ${o.tkBest} 支`:'還沒打出火雞'}</td><td>${money(o.turkey)}</td></tr>
+    <tr><td>團體賽</td><td>${o.tw} 勝 ${o.tl} 敗${o.td?` ${o.td} 平`:''}</td></tr>
+    <tr><td>個人賽</td><td>${o.ip?`第一名 ${o.iw} 次（參加 ${o.ip} 局）`:'沒參加'}</td></tr>
+    <tr><td>火雞</td><td>${o.tkBest?`最高連續 ${o.tkBest} 支（打出 ${o.tk} 次）`:'還沒打出火雞'}</td></tr>
   </tbody></table></div>
   <h2>每天明細</h2>
-  <div class="box scroll"><table class="mx"><thead><tr><th>日期</th><th>局數</th><th>平均</th><th>最高</th><th>團體</th><th>個人</th><th>火雞</th></tr></thead><tbody>
-  ${D.map(d=>`<tr><td class="nm">${fmtDate(d.date)}${d.today?'<br><span class="mk">今天</span>':''}</td><td>${d.n}</td><td>${(d.sum/d.n).toFixed(1)}</td><td>${d.best}</td><td>${money(d.team)}</td><td>${money(d.indiv)}</td><td>${money(d.turkey)}</td></tr>`).join('')}
+  <div class="box scroll"><table class="mx"><thead><tr><th>日期</th><th>局數</th><th>平均</th><th>當天最高</th></tr></thead><tbody>
+  ${D.map(d=>`<tr><td class="nm">${fmtDate(d.date)}${d.today?'<br><span class="mk">今天</span>':''}</td><td>${d.n}</td><td>${(d.sum/d.n).toFixed(1)}</td><td>${d.best}</td></tr>`).join('')}
   </tbody></table></div>`;
   return h;
 }
