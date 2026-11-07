@@ -126,6 +126,7 @@ input[type=date]{font:600 17px var(--f);padding:6px 10px;border:1.5px solid var(
 .chip.girl.on{background:var(--girl);border-color:var(--girl);color:#fff}
 .recs{display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:start}
 .rcol{display:flex;flex-direction:column;gap:8px;min-width:0}
+.rec .src{font-size:11px;font-weight:700;color:var(--muted);background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:0 5px;margin-left:5px;vertical-align:2px}
 .tkline{margin-top:8px;padding-top:7px;border-top:1px dashed var(--line);font-size:13px;font-weight:700;line-height:1.45}
 .tkline b{font:700 17px var(--num);color:var(--ink)}
 .lbbar{display:flex;align-items:center;gap:10px;width:100%;border:1.5px solid var(--ink);background:var(--card);color:var(--ink);border-radius:10px;padding:9px 16px;font:700 18px var(--f);cursor:pointer;text-align:left}
@@ -602,19 +603,22 @@ function vCareerTeam(){
   let h=`<p class="hint">已儲存 ${S.history.length} 天紀錄${S.games.length?'，加上今天':''}。</p>
   ${picker('排行榜',S.roster.filter(n=>P[n]).concat(names.filter(n=>!S.roster.includes(n))),who)}`;
   if(!who){
-    // 目前紀錄：左邊團體賽、右邊個人偷練，各分男女（同分的人都列出）
+    // 目前紀錄：最高分和連續火雞取團體賽、偷練兩邊最高；平均只算團體賽（同分的人都列出）
     const Q=prStats();
+    const C={}; // 每人合併：最高分（含來源）、最高連續火雞
+    new Set([...Object.keys(P),...Object.keys(Q)]).forEach(n=>{const tb=P[n]?P[n].best:0, qb=Q[n]?Q[n].best:0;
+      C[n]={best:Math.max(tb,qb), src:tb>=qb?(qb===tb&&qb?'團體賽、偷練':'團體賽'):'偷練', tkBest:Math.max(P[n]?P[n].tkBest:0,Q[n]?Q[n].tkBest:0)}});
     const top=(D,male,key,fmt)=>{const L=Object.keys(D).filter(n=>isMale(n)===male&&D[n][key]>0); if(!L.length)return null;
       const v=Math.max(...L.map(n=>D[n][key])); return {who:L.filter(n=>D[n][key]===v),val:fmt(v)}};
     const pt=v=>v+' 分', av=v=>v.toFixed(1)+' 分', tk=v=>v+' 支';
-    const who2=r=>r?`${r.who.map(nm).join('、')}<br><b>${r.val}</b>`:'<span class="hint" style="margin:0;font-weight:400">還沒有紀錄</span>';
-    const best=(D,m,ic,t)=>{const r=top(D,m,'best',pt), k=top(D,m,'tkBest',tk);
-      return `<div class="rec"><span class="rt"><span class="ic" aria-hidden="true">${ic}</span>${t}</span><div class="rv">${who2(r)}</div>
+    const none='<span class="hint" style="margin:0;font-weight:400">還沒有紀錄</span>';
+    const best=(m,ic,t)=>{const r=top(C,m,'best',pt), k=top(C,m,'tkBest',tk);
+      return `<div class="rec"><span class="rt"><span class="ic" aria-hidden="true">${ic}</span>${t}</span>
+        <div class="rv">${r?`${r.who.map(n=>`${nm(n)}<span class="src">${C[n].src}</span>`).join('、')}<br><b>${r.val}</b>`:none}</div>
         <div class="tkline"><span aria-hidden="true">🦃</span> ${k?`連續火雞 <b>${k.val}</b><br>${k.who.map(nm).join('、')}`:'<span class="hint" style="margin:0">還沒有火雞紀錄</span>'}</div></div>`};
-    const avgc=(D,m,ic,t)=>`<div class="rec"><span class="rt"><span class="ic" aria-hidden="true">${ic}</span>${t}</span><div class="rv">${who2(top(D,m,'avg',av))}</div></div>`;
-    h+=`<h2>目前紀錄</h2><div class="recs">
-      <div class="rcol"><div class="rh">團體賽</div>${best(P,true,'🏆','男生目前最高紀錄')}${best(P,false,'👑','女生目前最高紀錄')}${avgc(P,true,'📊','男生目前平均最高紀錄')}${avgc(P,false,'📈','女生目前平均最高紀錄')}</div>
-      <div class="rcol"><div class="rh">個人偷練</div>${best(Q,true,'🏆','男生目前最高紀錄')}${best(Q,false,'👑','女生目前最高紀錄')}</div></div>`;
+    const avgc=(m,ic,t)=>{const r=top(P,m,'avg',av); return `<div class="rec"><span class="rt"><span class="ic" aria-hidden="true">${ic}</span>${t}</span><div class="rv">${r?`${r.who.map(nm).join('、')}<br><b>${r.val}</b>`:none}</div></div>`};
+    h+=`<h2>目前紀錄</h2><p class="hint">最高分和連續火雞取團體賽和偷練裡最高的；平均只算團體賽。</p>
+      <div class="recs">${best(true,'🏆','男生目前最高紀錄')}${best(false,'👑','女生目前最高紀錄')}${avgc(true,'📊','男生目前平均最高紀錄')}${avgc(false,'📈','女生目前平均最高紀錄')}</div>`;
     const rows=names.map(n=>[n,P[n]]).sort((a,b)=>b[1].avg-a[1].avg);
     h+=`<h2>排行榜</h2><p class="hint">依平均分排序。</p>
     <div class="box scroll"><table class="mx lb"><thead><tr><th>人</th><th>局數</th><th>平均</th><th>生涯最高分</th><th>連續火雞</th></tr></thead><tbody>
