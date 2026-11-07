@@ -109,6 +109,14 @@ dialog p{margin:0 0 14px;font-size:17px;font-weight:700}
 .line{background:#06C755;color:#fff;text-decoration:none;display:inline-flex;align-items:center}
 textarea{width:100%;min-height:160px;font:14px var(--f);padding:10px;border:1.5px solid var(--line);border-radius:8px;background:var(--paper);color:var(--ink)}
 input[type=date]{font:600 17px var(--f);padding:6px 10px;border:1.5px solid var(--line);border-radius:8px;background:var(--paper);color:var(--ink)}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px}
+.stat b{display:block;font:700 30px/1.1 var(--num)}
+.stat span{font-size:13px;color:var(--muted)}
+.stat.money b{font-size:26px}
+.lb td.nm button{all:unset;cursor:pointer;font-weight:700;text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:3px}
+.spark{width:100%;height:auto;display:block}
+@media (max-width:380px){.stats{grid-template-columns:repeat(2,1fr)}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
@@ -116,12 +124,13 @@ input[type=date]{font:600 17px var(--f);padding:6px 10px;border:1.5px solid var(
 <div class="wrap">
   <header>
     <h1>家族保齡球<small>團體賽＋個人賽計分</small></h1>
-    <div class="pins" id="gcount"></div>
+    <div class="pins"><div id="gcount"></div><div id="sync" style="font-size:13px"></div></div>
   </header>
   <nav>
     <button data-tab="setup">設定</button>
     <button data-tab="game">本局</button>
     <button data-tab="bill">結算</button>
+    <button data-tab="career">生涯</button>
   </nav>
   <main id="main"></main>
 </div>
@@ -132,10 +141,11 @@ input[type=date]{font:600 17px var(--f);padding:6px 10px;border:1.5px solid var(
 const KEY='family-bowling-v1';
 const DEFAULT=['軍','靖','WD瀧','Yu','阿娟','見雄','俊儀','開庭','宏進','川平','川豪','紀婷'];
 const today=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};
+function newId(){return 'd'+Date.now().toString(36)+Math.random().toString(36).slice(2,6)}
 const fresh=()=>({date:today(),bingo:Array(12).fill(''),roster:[...DEFAULT],present:{},hcp:{},hcpI:{},indiv:{},turkeyP:{},noCount:{},useHcpIndiv:true,games:[],cur:{pairs:[],solo:{},scores:{},pick:null,mode:'rps',manual:{}},tab:'setup'});
 let S;
 try{S=JSON.parse(localStorage.getItem(KEY))||fresh()}catch(e){S=fresh()}
-S=Object.assign(fresh(),S); S.hcpI=S.hcpI||{}; S.turkeyP=S.turkeyP||{}; S.noCount=S.noCount||{}; if(!Array.isArray(S.bingo)||S.bingo.length!==12){const o=Array.isArray(S.bingo)?S.bingo:[];S.bingo=Array.from({length:12},(_,i)=>o[i]!=null?o[i]:'')}
+S=Object.assign(fresh(),S); S.history=Array.isArray(S.history)?S.history:[]; S.history.forEach(d=>{if(!d.id)d.id=newId()}); S.hcpI=S.hcpI||{}; S.turkeyP=S.turkeyP||{}; S.noCount=S.noCount||{}; if(!Array.isArray(S.bingo)||S.bingo.length!==12){const o=Array.isArray(S.bingo)?S.bingo:[];S.bingo=Array.from({length:12},(_,i)=>o[i]!=null?o[i]:'')}
 (function rename(o,n){ // 舊紀錄改名
   if(!S.roster.includes(o))return;
   S.roster=S.roster.map(x=>x===o?n:x);
@@ -150,7 +160,7 @@ function ask(msg,yes){const d=document.getElementById('dlg');document.getElement
   document.getElementById('dlgYes').onclick=()=>{d.close();yes()};document.getElementById('dlgNo').onclick=()=>d.close();
   if(d.showModal)d.showModal();else if(window.confirm(msg))yes();}
 const fmtDate=s=>s?s.replace(/-/g,'/'):'';
-function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){} if(typeof scheduleSync==='function')scheduleSync()}
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const present=()=>S.roster.filter(n=>S.present[n]);
 const money=n=>{n=Math.round(n);return n>0?`<span class="money pos">+$${n}</span>`:n<0?`<span class="money neg">−$${-n}</span>`:`<span class="money zero">$0</span>`};
@@ -252,9 +262,12 @@ function vSetup(){
   <div class="box"><div class="bingo">${S.bingo.map((v,i)=>`<input type="number" inputmode="numeric" placeholder="—" aria-label="賓果數字 ${i+1}" data-in="bingo" data-i="${i}" value="${esc(v)}">`).join('')}</div>
     <div class="btns" style="margin-top:8px"><button class="btn ghost" data-act="clearbingo">清空賓果數字</button></div></div>
   <div class="btns"><button class="btn" data-act="tab" data-t="game" ${p.length<2?'disabled':''}>開始分組</button></div>
+  <h2>結束今天的比賽</h2>
+  <p class="hint">把今天打完的局數存進「生涯」紀錄，然後清空，日期改回今天。出席名單、讓分和賓果數字會保留。</p>
+  <button class="btn" data-act="archive" ${S.games.length?'':'disabled'}>結束今天，存入生涯紀錄</button>
   <h2>重新開始</h2>
-  <p class="hint">清掉所有局數紀錄，日期改回今天，出席名單和讓分會保留。</p>
-  <button class="btn warn" data-act="reset">清空所有局數</button>`;
+  <p class="hint">直接清掉今天的局數，不會存進生涯紀錄。</p>
+  <button class="btn warn" data-act="reset">清空今天的局數</button>`;
 }
 function vGame(){
   cleanCur();
@@ -332,31 +345,34 @@ function vBill(){
   <textarea id="exp" readonly class="hide" aria-label="結算文字">${esc(exportText())}</textarea>
   <h2>各局紀錄</h2>`;
   h+=S.games.map((g,i)=>{const r=compute(g);const ns=Object.keys(g.teams);
-    if(S.editGame===i) return editGameHtml(g,i,r);
+    if(S.editGame==='t:'+i) return editGameHtml(g,i,r,'t:'+i);
     return `<details class="box game"><summary><span>第 ${i+1} 局</span><span>甲 ${r.A} : ${r.B} 乙　${r.loser?TEAM[r.loser==='A'?'B':'A']+'勝':'平手'}</span></summary>
     <div class="scroll"><table style="margin-top:8px"><thead><tr><th>人</th><th>隊</th><th>分數</th><th>團讓</th><th>個讓</th><th>火雞</th><th>個人</th><th>本局</th></tr></thead><tbody>
     ${ns.map(n=>{const s=g.scores[n];return `<tr><td>${esc(n)}</td><td><span class="tag ${g.teams[n]}" style="margin:0">${TEAM[g.teams[n]]}</span></td><td>${r.bingo[n]?'🎟️ ':''}${+s.s||0}${s.nc?'<br><span class="hint" style="font-size:12px">不計分</span>':''}</td><td>${+s.h||0}</td><td>${g.indiv[n]&&g.v>=2?(+s.hi||0):'—'}</td><td>${inT(g,n)?(+s.t||0):'—'}</td><td>${r.place[n]||'—'}</td><td>${money(sumD(r.d[n]))}</td></tr>`}).join('')}
     </tbody></table></div>
     ${r.tlog.map(x=>`<p class="hint" style="margin:8px 0 0">${esc(tlogLine(x))}</p>`).join('')}
     ${Object.keys(r.bingo).length?`<p class="hint cp" style="margin:8px 0 0">🎟️ 賓果優惠券：${Object.entries(r.bingo).map(([n,v])=>esc(n)+'（'+v+'）').join('、')}</p>`:''}
-    <div class="btns"><button class="btn" data-act="editgame" data-i="${i}">修改這局</button><button class="btn warn" data-act="delgame" data-i="${i}">刪除這局</button></div></details>`}).join('');
+    <div class="btns"><button class="btn" data-act="editgame" data-ref="t:${i}">修改這局</button><button class="btn warn" data-act="delgame" data-i="${i}">刪除這局</button></div></details>`}).join('');
   return h;
 }
 
-function editGameHtml(g,i,r){
+// ref：'t:局' 今天的局，'h:天:局' 生涯紀錄裡已存的局
+function gameAt(ref){const a=String(ref).split(':'); return a[0]==='t'?S.games[+a[1]]:(S.history[+a[1]]||{games:[]}).games[+a[2]]}
+function editGameHtml(g,i,r,ref,title){
+  ref=ref||('t:'+i); title=title||`修改第 ${i+1} 局`;
   const ns=Object.keys(g.teams);
-  const f=(n,k,v,lab)=>`<label class="sm">${lab} <input type="number" inputmode="numeric" data-eg="${i}" data-k="${k}" data-n="${esc(n)}" value="${esc(v)}"></label>`;
+  const f=(n,k,v,lab)=>`<label class="sm">${lab} <input type="number" inputmode="numeric" data-eg="${esc(ref)}" data-k="${k}" data-n="${esc(n)}" value="${esc(v)}"></label>`;
   return `<div class="box game" id="editBox" style="border:2px solid var(--gold)">
-    <div style="display:flex;justify-content:space-between;font-weight:700"><span>修改第 ${i+1} 局</span><span>甲 ${r.A} : ${r.B} 乙</span></div>
+    <div style="display:flex;justify-content:space-between;font-weight:700"><span>${title}</span><span>甲 ${r.A} : ${r.B} 乙</span></div>
     <p class="hint" style="margin:4px 0 0">改完每一格，金額會自動重算。可以改分數、讓分、火雞、隊伍。</p>
     ${ns.map(n=>{const s=g.scores[n];return `<div class="score">
       <div class="top"><span class="nm">${esc(n)}</span>
-        <span class="seg"><button class="${g.teams[n]==='A'?'on':''}" data-act="egteam" data-i="${i}" data-n="${esc(n)}" data-v="A">甲隊</button><button class="${g.teams[n]==='B'?'on':''}" data-act="egteam" data-i="${i}" data-n="${esc(n)}" data-v="B">乙隊</button></span></div>
+        <span class="seg"><button class="${g.teams[n]==='A'?'on':''}" data-act="egteam" data-ref="${esc(ref)}" data-n="${esc(n)}" data-v="A">甲隊</button><button class="${g.teams[n]==='B'?'on':''}" data-act="egteam" data-ref="${esc(ref)}" data-n="${esc(n)}" data-v="B">乙隊</button></span></div>
       <div class="fields">
         ${f(n,'s',s.s,'分數')}${f(n,'h',+s.h||0,'團體讓分')}
         ${g.indiv[n]&&g.v>=2?f(n,'hi',+s.hi||0,'個人讓分'):''}
         ${inT(g,n)?f(n,'t',+s.t||0,'火雞'):''}
-        <label class="sm">不計分 <input type="checkbox" class="tog" data-eg="${i}" data-k="nc" data-n="${esc(n)}" ${s.nc?'checked':''}></label>
+        <label class="sm">不計分 <input type="checkbox" class="tog" data-eg="${esc(ref)}" data-k="nc" data-n="${esc(n)}" ${s.nc?'checked':''}></label>
       </div></div>`}).join('')}
     <div class="btns"><button class="btn" data-act="editdone">完成修改</button></div>
   </div>`;
@@ -503,12 +519,171 @@ async function drawImage(){
   return cv;
 }
 
+/* ---------- 生涯紀錄 ---------- */
+function sessions(){ // 已存的每一天＋今天（還沒結束的）
+  const L=S.history.map((d,i)=>({date:d.date,games:d.games,hi:i}));
+  if(S.games.length)L.push({date:S.date,games:S.games,today:true});
+  return L;
+}
+function career(){
+  const P={};
+  const me=n=>P[n]||(P[n]={games:[],days:{},team:0,indiv:0,turkey:0,tw:0,tl:0,td:0,iw:0,ip:0,tk:0,tkBest:0,cp:0});
+  sessions().forEach((ss,si)=>ss.games.forEach((g,gi)=>{const r=compute(g);
+    Object.keys(g.teams).forEach(n=>{const s=g.scores[n]; if(!s||s.s===''||s.s==null)return; const o=me(n), sc=+s.s;
+      o.games.push({date:ss.date,g:gi+1,s:sc,si});
+      const dk=si; const d=o.days[dk]||(o.days[dk]={date:ss.date,today:ss.today,hi:ss.hi,n:0,sum:0,best:0,team:0,indiv:0,turkey:0}); d.n++;d.sum+=sc;d.best=Math.max(d.best,sc);
+      const x=r.d[n]; o.team+=x.team;o.indiv+=x.indiv;o.turkey+=x.turkey; d.team+=x.team;d.indiv+=x.indiv;d.turkey+=x.turkey;
+      if(!r.loser)o.td++; else if(g.teams[n]===r.loser)o.tl++; else o.tw++;
+      if(g.indiv[n]&&r.P.length>=2){o.ip++; if(r.place[n]==='贏')o.iw++;}
+      const t=+s.t||0; if(inT(g,n)&&t>=3){o.tk++;o.tkBest=Math.max(o.tkBest,t)}
+      if(r.bingo[n])o.cp++;
+    })}));
+  Object.values(P).forEach(o=>{const a=o.games.map(x=>x.s);o.n=a.length;o.avg=a.length?a.reduce((p,q)=>p+q,0)/a.length:0;o.best=Math.max(0,...a);o.bestAt=o.games.find(x=>x.s===o.best);});
+  return P;
+}
+function spark(games){
+  const L=games.slice(-12); if(L.length<2)return '';
+  const W=360,H=170,pl=30,pr=8,pt=12,pb=26, max=Math.max(300,...L.map(x=>x.s)), min=0;
+  const X=i=>pl+(W-pl-pr)*(L.length===1?0:i/(L.length-1)), Y=v=>pt+(H-pt-pb)*(1-(v-min)/(max-min));
+  const avg=L.reduce((a,x)=>a+x.s,0)/L.length;
+  const pts=L.map((x,i)=>`${X(i).toFixed(1)},${Y(x.s).toFixed(1)}`).join(' ');
+  return `<svg class="spark" viewBox="0 0 ${W} ${H}" role="img" aria-label="最近 ${L.length} 局分數走勢">
+    ${[0,100,200,300].map(v=>`<line x1="${pl}" x2="${W-pr}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)" stroke-width="1"/><text x="${pl-6}" y="${Y(v)+4}" text-anchor="end" font-size="11" fill="var(--muted)">${v}</text>`).join('')}
+    <line x1="${pl}" x2="${W-pr}" y1="${Y(avg)}" y2="${Y(avg)}" stroke="var(--gold)" stroke-width="1.5" stroke-dasharray="5 4"/>
+    <polyline points="${pts}" fill="none" stroke="var(--lane)" stroke-width="2.5" stroke-linejoin="round"/>
+    ${L.map((x,i)=>`<circle cx="${X(i)}" cy="${Y(x.s)}" r="4" fill="var(--card)" stroke="var(--lane)" stroke-width="2"/><text x="${X(i)}" y="${Y(x.s)-9}" text-anchor="middle" font-size="11" fill="var(--ink)">${x.s}</text>`).join('')}
+  </svg><p class="hint" style="margin:2px 0 0">最近 ${L.length} 局分數，金色虛線是這幾局的平均 ${avg.toFixed(1)}</p>`;
+}
+function vCareer(){
+  const P=career(), names=Object.keys(P);
+  if(!names.length) return `<h2>生涯紀錄</h2><div class="empty">還沒有任何紀錄。打完一局並儲存後，這裡就會開始累積。</div>`;
+  const who=S.careerWho&&P[S.careerWho]?S.careerWho:null;
+  const days=sessions().length;
+  let h=`<h2>生涯紀錄</h2>
+  <p class="hint">共 ${days} 天的紀錄（${S.history.length} 天已存${S.games.length?'＋今天':''}）。點名字看個人紀錄。</p>
+  <div class="chips"><button class="chip ${who?'':'on'}" data-act="who" data-n="">排行榜</button>${S.roster.filter(n=>P[n]).concat(names.filter(n=>!S.roster.includes(n))).map(n=>`<button class="chip ${who===n?'on':''}" data-act="who" data-n="${esc(n)}">${esc(n)}</button>`).join('')}</div>`;
+  if(!who){
+    const rows=names.map(n=>[n,P[n]]).sort((a,b)=>b[1].avg-a[1].avg);
+    h+=`<h2>排行榜</h2><p class="hint">依平均分排序。合計是團體賽＋個人賽，火雞賽另列。</p>
+    <div class="box scroll"><table class="mx lb"><thead><tr><th>人</th><th>局數</th><th>平均</th><th>最高</th><th>合計</th><th>火雞賽</th><th>🎟️</th></tr></thead><tbody>
+    ${rows.map(([n,o])=>`<tr><td class="nm"><button data-act="who" data-n="${esc(n)}">${esc(n)}</button></td><td>${o.n}</td><td><b>${o.avg.toFixed(1)}</b></td><td>${o.best}</td><td>${money(o.team+o.indiv)}</td><td>${money(o.turkey)}</td><td>${o.cp||'—'}</td></tr>`).join('')}
+    </tbody></table></div>`;
+    if(S.history.length) h+=`<h2>已存的比賽日</h2><p class="hint">點日期打開，可以修改每一局的分數、讓分、火雞、隊伍，也能改日期。</p>${S.history.map((d,di)=>{const op=S.openDay===di;
+      return `<div class="box game" ${op?'style="border:2px solid var(--line)"':''}><div class="pair" style="border:0;padding:0"><button class="who" style="text-align:left;flex:1;border:0;background:none;padding:4px 0" data-act="openday" data-i="${di}">${op?'▾':'▸'} ${fmtDate(d.date)}　<span class="hint" style="margin:0">${d.games.length} 局</span></button></div>
+      ${op?`<div class="btns" style="margin-top:4px"><label class="sm">日期 <input type="date" data-hd="${di}" value="${esc(d.date)}"></label></div>
+        ${d.games.map((g,gi)=>{const ref=`h:${di}:${gi}`, r=compute(g);
+          if(S.editGame===ref) return editGameHtml(g,gi,r,ref,`修改 ${fmtDate(d.date)} 第 ${gi+1} 局`);
+          return `<div class="pair"><span style="flex:1"><b>第 ${gi+1} 局</b>　<span class="hint" style="margin:0">甲 ${r.A} : ${r.B} 乙　${Object.keys(g.teams).map(n=>esc(n)+' '+(+g.scores[n].s||0)).join('、')}</span></span><button class="btn ghost" style="padding:7px 12px" data-act="editgame" data-ref="${ref}">修改</button></div>`}).join('')}
+        <div class="btns"><button class="btn warn" data-act="delday" data-i="${di}">刪除這天</button></div>`:''}</div>`}).reverse().join('')}`;
+    return h;
+  }
+  const o=P[who], tot=o.team+o.indiv;
+  const D=Object.values(o.days).reverse();
+  h+=`<h2>${esc(who)}</h2>
+  <div class="stats">
+    <div class="stat"><b>${o.n}</b><span>總局數（${D.length} 天）</span></div>
+    <div class="stat"><b>${o.avg.toFixed(1)}</b><span>平均分</span></div>
+    <div class="stat"><b>${o.best}</b><span>最高分${o.bestAt?`<br>${fmtDate(o.bestAt.date)} 第${o.bestAt.g}局`:''}</span></div>
+    <div class="stat money"><b class="${tot>0?'pos':tot<0?'neg':'zero'}">${tot>0?'+':tot<0?'−':''}$${Math.abs(Math.round(tot))}</b><span>合計輸贏<br>（團體＋個人）</span></div>
+    <div class="stat money"><b class="${o.turkey>0?'pos':o.turkey<0?'neg':'zero'}">${o.turkey>0?'+':o.turkey<0?'−':''}$${Math.abs(Math.round(o.turkey))}</b><span>火雞賽輸贏</span></div>
+    <div class="stat"><b>${o.cp}</b><span>🎟️ 賓果優惠券</span></div>
+  </div>
+  <h2>分數走勢</h2><div class="box">${spark(o.games)||'<p class="hint" style="margin:0">打滿 2 局後會顯示走勢圖。</p>'}</div>
+  <h2>各項成績</h2>
+  <div class="box scroll"><table><tbody>
+    <tr><td>團體賽</td><td>${o.tw} 勝 ${o.tl} 敗${o.td?` ${o.td} 平`:''}</td><td>${money(o.team)}</td></tr>
+    <tr><td>個人賽</td><td>${o.ip?`參加 ${o.ip} 局，第一名 ${o.iw} 次`:'沒參加'}</td><td>${money(o.indiv)}</td></tr>
+    <tr><td>火雞賽</td><td>${o.tk?`打出 ${o.tk} 次，最多連續 ${o.tkBest} 支`:'還沒打出火雞'}</td><td>${money(o.turkey)}</td></tr>
+  </tbody></table></div>
+  <h2>每天明細</h2>
+  <div class="box scroll"><table class="mx"><thead><tr><th>日期</th><th>局數</th><th>平均</th><th>最高</th><th>團體</th><th>個人</th><th>火雞</th></tr></thead><tbody>
+  ${D.map(d=>`<tr><td class="nm">${fmtDate(d.date)}${d.today?'<br><span class="mk">今天</span>':''}</td><td>${d.n}</td><td>${(d.sum/d.n).toFixed(1)}</td><td>${d.best}</td><td>${money(d.team)}</td><td>${money(d.indiv)}</td><td>${money(d.turkey)}</td></tr>`).join('')}
+  </tbody></table></div>`;
+  return h;
+}
+
+/* ---------- 雲端同步（Firebase Firestore，REST） ---------- */
+const FB={apiKey:"AIzaSyCuUa7N43CytRteEKRrJjDeHm-ikzmOhHs",projectId:"family-bowling"};
+const FBURL=`https://firestore.googleapis.com/v1/projects/${FB.projectId}/databases/(default)/documents/bowling/meta`;
+const SHARED=['roster','present','hcp','hcpI','indiv','turkeyP','noCount','bingo','date'];
+const SYNC={ready:false,busy:false,timer:null,offer:false,state:'',last:{meta:null,days:{}}};
+function snapshot(){ // 目前要放上雲端的內容（每份都是 JSON 字串）
+  const m={}; SHARED.forEach(k=>m[k]=S[k]);
+  const days={};
+  S.history.forEach(d=>{if(!d.id)d.id=newId(); days[d.id]=JSON.stringify({date:d.date,games:d.games,archived:true})});
+  if(S.games.length){ if(!S.todayId)S.todayId=newId(); days[S.todayId]=JSON.stringify({date:S.date,games:S.games,archived:false}); }
+  return {meta:JSON.stringify(m),days};
+}
+function setSync(st){SYNC.state=st; const el=document.getElementById('sync'); if(el)el.textContent={ok:'☁️ 已同步',busy:'☁️ 同步中…',off:'⚠️ 離線（先存在本機）',wait:'☁️ 連線中…'}[st]||''}
+async function fb(method,path,body){
+  const r=await fetch(FBURL+path+(path.includes('?')?'&':'?')+'key='+FB.apiKey,{method,headers:body?{'Content-Type':'application/json'}:{},body:body?JSON.stringify(body):undefined});
+  if(r.status===404)return null; if(!r.ok)throw new Error('HTTP '+r.status); return r.status===204?{}:r.json();
+}
+async function pullRemote(){
+  const [meta,list]=await Promise.all([fb('GET',''),fb('GET','/days?pageSize=500')]);
+  const days={}; ((list&&list.documents)||[]).forEach(d=>{const id=d.name.split('/').pop(); const v=d.fields&&d.fields.json&&d.fields.json.stringValue; if(v)days[id]=v});
+  return {meta:meta&&meta.fields&&meta.fields.json?meta.fields.json.stringValue:null,days};
+}
+function applyRemote(R){
+  if(R.meta){const m=JSON.parse(R.meta); SHARED.forEach(k=>{if(m[k]!==undefined)S[k]=m[k]})}
+  const hist=[]; let tday=null;
+  Object.entries(R.days).forEach(([id,js])=>{const d=JSON.parse(js); if(d.archived)hist.push({id,date:d.date,games:d.games||[]}); else if(!tday||id>tday.id)tday={id,date:d.date,games:d.games||[]}});
+  hist.sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:(a.id<b.id?-1:1));
+  S.history=hist;
+  if(tday){S.games=tday.games;S.todayId=tday.id;S.date=tday.date||S.date}else{S.games=[];S.todayId=null}
+  if(S.editGame!=null&&!gameAt(S.editGame))S.editGame=null;
+}
+const changed=()=>{const s=snapshot(),L=SYNC.last; if(s.meta!==L.meta)return true; const ids=new Set([...Object.keys(s.days),...Object.keys(L.days)]); for(const id of ids)if(s.days[id]!==L.days[id])return true; return false};
+function scheduleSync(){ if(!SYNC.ready)return; clearTimeout(SYNC.timer); SYNC.timer=setTimeout(doPush,700); }
+async function doPush(){
+  if(!SYNC.ready||SYNC.busy)return; if(!changed()){if(SYNC.state!=='off')setSync('ok');return}
+  SYNC.busy=true; setSync('busy');
+  try{
+    const s=snapshot(), L=SYNC.last, now=String(Date.now());
+    if(s.meta!==L.meta){await fb('PATCH','',{fields:{json:{stringValue:s.meta},updated:{integerValue:now}}}); L.meta=s.meta}
+    for(const [id,js] of Object.entries(s.days)) if(js!==L.days[id]){await fb('PATCH','/days/'+id,{fields:{json:{stringValue:js},updated:{integerValue:now}}}); L.days[id]=js}
+    for(const id of Object.keys(L.days)) if(!(id in s.days)){await fb('DELETE','/days/'+id); delete L.days[id]}
+    setSync('ok');
+  }catch(e){setSync('off')}
+  SYNC.busy=false; if(changed())scheduleSync();
+}
+async function doPull(first){
+  if(SYNC.busy)return;
+  if(!first&&SYNC.ready&&changed()){doPush();return}            // 本機有沒上傳的修改，先上傳
+  const a=document.activeElement; if(!first&&a&&/INPUT|TEXTAREA|SELECT/.test(a.tagName))return; // 正在輸入時先不更新畫面
+  try{
+    const R=await pullRemote();
+    const empty=!R.meta&&!Object.keys(R.days).length;
+    if(first&&!Object.keys(R.days).length&&(S.history.length||S.games.length)){ // 雲端還沒有紀錄，這支手機有
+      SYNC.offer=true; setSync('ok'); render(); return;
+    }
+    if(!empty){
+      const same=R.meta===SYNC.last.meta&&JSON.stringify(R.days)===JSON.stringify(SYNC.last.days);
+      if(!same||first){ applyRemote(R); SYNC.last={meta:R.meta,days:{...R.days}}; SYNC.ready=true; render(); }
+    } else { SYNC.last={meta:null,days:{}}; }
+    SYNC.ready=true; setSync('ok');
+  }catch(e){ setSync('off'); if(first){SYNC.ready=false;} }
+}
+function uploadBanner(){
+  if(!SYNC.offer)return '';
+  const n=S.history.length+(S.games.length?1:0);
+  return `<div class="box" style="margin-top:12px;border:2px solid var(--gold);background:var(--goldsoft)">
+    <b>雲端還沒有任何紀錄</b><p class="hint" style="margin:4px 0 0">這支手機裡有 ${n} 天的比賽紀錄。上傳後，大家用自己的手機打開網址就能看到。只要記分的那支手機上傳一次就好。</p>
+    <div class="btns"><button class="btn" data-act="upload">上傳這支手機的紀錄</button><button class="btn ghost" data-act="noupload">先不要</button></div></div>`;
+}
+function startSync(){
+  setSync('wait'); doPull(true);
+  setInterval(()=>{if(document.visibilityState==='visible')doPull(false)},15000);
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')doPull(false)});
+  window.addEventListener('online',()=>doPull(!SYNC.ready));
+}
+
 /* ---------- render ---------- */
 function render(){
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.tab===S.tab));
   document.getElementById('gcount').textContent=fmtDate(S.date)+(S.games.length?`　已打 ${S.games.length} 局`:'');
   const m=document.getElementById('main');
-  m.innerHTML=S.tab==='setup'?vSetup():S.tab==='game'?vGame():vBill();
+  m.innerHTML=uploadBanner()+(S.tab==='setup'?vSetup():S.tab==='game'?vGame():S.tab==='career'?vCareer():vBill());
   updateStick(); save();
 }
 function updateStick(){
@@ -546,9 +721,10 @@ document.addEventListener('click',e=>{
     case 'unpair': c.pairs.splice(i,1); break;
     case 'solo': c.solo[n]=b.dataset.v; break;
     case 'clearpairs': c.pairs=[];c.solo={};c.pick=null;c.manual={}; break;
-    case 'editgame': S.editGame=i; render(); setTimeout(()=>{const e=document.getElementById('editBox');if(e)e.scrollIntoView({block:'start'})},0); return;
+    case 'editgame': S.editGame=b.dataset.ref; if(String(S.editGame)[0]==='h')S.openDay=+S.editGame.split(':')[1]; render(); setTimeout(()=>{const e=document.getElementById('editBox');if(e)e.scrollIntoView({block:'start'})},0); return;
     case 'editdone': S.editGame=null; break;
-    case 'egteam': S.games[i].teams[n]=b.dataset.v; break;
+    case 'egteam': {const g=gameAt(b.dataset.ref); if(g)g.teams[n]=b.dataset.v; break;}
+    case 'openday': S.openDay=S.openDay===i?null:i; S.editGame=null; break;
     case 'clearbingo': ask('確定清空所有賓果數字？',()=>{S.bingo=Array(12).fill('');render()}); return;
     case 'rankpair': applyRankPairs(c); break;
     case 'billtab': S.billTab=b.dataset.v; break;
@@ -564,7 +740,12 @@ document.addEventListener('click',e=>{
       break;}
     case 'save': {const g=curGame(); S.games.push(JSON.parse(JSON.stringify(g))); S.cur=newCur(); S.tab='bill'; window.scrollTo(0,0); break;}
     case 'delgame': ask(`確定刪除第 ${i+1} 局？`,()=>{S.games.splice(i,1);render()}); return;
-    case 'reset': ask('確定清空所有局數紀錄？',()=>{S.games=[];S.cur=newCur();S.date=today();render()}); return;
+    case 'upload': ask('把這支手機的紀錄上傳到雲端，讓大家都看得到？',()=>{SYNC.offer=false;SYNC.last={meta:null,days:{}};SYNC.ready=true;render();doPush()}); return;
+    case 'noupload': SYNC.offer=false; SYNC.ready=true; SYNC.last=snapshot(); break;
+    case 'archive': ask(`把 ${fmtDate(S.date)} 的 ${S.games.length} 局存進生涯紀錄？`,()=>{S.history.push({id:S.todayId||newId(),date:S.date,games:S.games});S.todayId=null;S.games=[];S.cur=newCur();S.editGame=null;S.date=today();S.tab='career';render();window.scrollTo(0,0)}); return;
+    case 'who': S.careerWho=n||null; break;
+    case 'delday': ask(`確定從生涯紀錄刪除 ${fmtDate(S.history[i].date)} 這天？`,()=>{S.history.splice(i,1);S.openDay=null;S.editGame=null;render()}); return;
+    case 'reset': ask('確定清空今天的局數？（不會存進生涯紀錄）',()=>{S.games=[];S.todayId=null;S.cur=newCur();S.date=today();render()}); return;
     case 'next': S.editGame=null; S.cur=newCur(); if(S.cur.mode==='rps')applyRankPairs(S.cur); S.tab='game'; window.scrollTo(0,0); break;
     case 'img': {b.disabled=true;b.textContent='產生中…';
       drawImage().then(async cv=>{const out=document.getElementById('imgOut');
@@ -591,12 +772,13 @@ document.addEventListener('click',e=>{
 });
 document.addEventListener('change',e=>{
   const el=e.target; if(el.dataset.eg==null)return;
-  const g=S.games[+el.dataset.eg]; if(!g)return; const s=g.scores[el.dataset.n]; const k=el.dataset.k;
+  const g=gameAt(el.dataset.eg); if(!g)return; const s=g.scores[el.dataset.n]; const k=el.dataset.k;
   if(k==='nc')s.nc=el.checked; else s[k]=k==='s'?el.value:(+el.value||0);
   render();
 });
 document.addEventListener('input',e=>{
   if(e.target.dataset.eg!=null)return;
+  if(e.target.dataset.hd!=null){const d=S.history[+e.target.dataset.hd]; if(d&&e.target.value){d.date=e.target.value;save()} return}
   const el=e.target, k=el.dataset.in, n=el.dataset.n; if(!k)return;
   if(k==='date'){S.date=el.value;save();document.getElementById('gcount').textContent=fmtDate(S.date)+(S.games.length?`　已打 ${S.games.length} 局`:'');return}
   if(k==='bingo'){S.bingo[+el.dataset.i]=el.value;save();return}
@@ -611,6 +793,7 @@ document.addEventListener('input',e=>{
   s[k]=el.value; refreshLive();
 });
 render();
+startSync();
 </script>
 </body>
 </html>
