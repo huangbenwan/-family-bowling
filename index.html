@@ -144,6 +144,15 @@ input[type=date]{font:600 17px var(--f);padding:6px 10px;border:1.5px solid var(
 .rec .rt{font-size:12.5px;color:var(--muted);display:block;line-height:1.4}
 .rec .rv{font-weight:700;margin-top:4px;line-height:1.35;word-break:break-word}
 .rec .rv b{font:700 22px var(--num);color:var(--ink);white-space:nowrap}
+.tgrid{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px}
+.tcol{text-align:center;border-radius:10px;padding:8px 4px}
+.tcol.A{background:var(--lanesoft)}.tcol.B{background:var(--redsoft)}
+.tcol .tn{font-weight:900;font-size:15px}.tcol.A .tn{color:var(--lane)}.tcol.B .tn{color:var(--red)}
+.tcol .ts{font:700 40px/1.05 var(--num)}
+.tcol .tp{font-size:13px;color:var(--muted)}
+.tvs{font:700 15px var(--num);color:var(--muted)}
+.tmsg{text-align:center;margin-top:10px;font-size:17px}
+.tmsg .big{font:700 26px var(--num);margin:0 4px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
@@ -343,8 +352,33 @@ function vGame(){
         ${g.indiv[n]?`<label class="sm">個人讓分 <input type="number" inputmode="numeric" data-in="hi" data-n="${esc(n)}" value="${esc(s.hi)}"></label>`:''}
         ${g.turkeyP[n]?`<label class="sm">火雞 <input type="number" inputmode="numeric" min="0" max="12" data-in="t" data-n="${esc(n)}" value="${esc(s.t||0)}"></label>`:''}
       </div>
-    </div>`}).join('')}</div>`;
+    </div>`}).join('')}</div>
+  <h2>暫時計分</h2>
+  <div class="box" id="tempBox">${tempHtml(g,t)}</div>`;
   return h;
+}
+// 暫時計分：只算已輸入分數的人（不計分的人不算），顯示目前差幾分、還沒打完的隊伍要追多少
+function tempInfo(g,t){
+  const T={A:{sum:0,done:0,all:0,left:[]},B:{sum:0,done:0,all:0,left:[]}};
+  Object.keys(t).forEach(n=>{const s=g.scores[n]; if(!s||s.nc)return; const o=T[t[n]]; o.all++;
+    if(s.s===''||s.s==null){o.left.push(n);return} o.done++; o.sum+=(+s.s||0)+(+s.h||0)});
+  return T;
+}
+function tempHtml(g,t){
+  const T=tempInfo(g,t), A=T.A, B=T.B, d=A.sum-B.sum;
+  if(!A.done&&!B.done) return '<p class="hint" style="margin:0">開始輸入分數後，這裡會即時顯示兩隊目前的比數。</p>';
+  const col=k=>{const o=T[k]; return `<div class="tcol ${k}"><div class="tn">${TEAM[k]}</div><div class="ts">${o.sum}</div><div class="tp">已輸入 ${o.done}/${o.all} 人</div></div>`};
+  const lead=d>0?'A':d<0?'B':null, gap=Math.abs(d);
+  let msg=lead?`<b class="${lead==='A'?'pos':'neg'}">${TEAM[lead]}</b>目前領先 <b class="big">${gap}</b> 分`:'目前<b class="big">平手</b>';
+  const tips=[];
+  ['A','B'].forEach(k=>{const o=T[k], other=k==='A'?B:A; if(!o.left.length)return;
+    const need=other.sum-o.sum; // 還要追的分數（含讓分）
+    const who=o.left.map(nm).join('、');
+    if(need>=0) tips.push(`${TEAM[k]}還沒輸入：${who}<br>${o.left.length>1?'合計':''}要打 <b>${need+1}</b> 分（含讓分）才贏，${need} 分平手${other.left.length?`（${TEAM[k==='A'?'B':'A']}也還有人沒輸入）`:''}`);
+    else tips.push(`${TEAM[k]}還沒輸入：${who}<br>目前已經領先${other.left.length?'':'，對方都打完了'}`);
+  });
+  return `<div class="tgrid">${col('A')}<div class="tvs">VS</div>${col('B')}</div>
+    <div class="tmsg">${msg}</div>${tips.map(x=>`<p class="hint" style="margin:8px 0 0">${x}</p>`).join('')}`;
 }
 const sumD=x=>x.team+x.indiv; // 火雞另計
 function teamCards(r,mem){
@@ -814,12 +848,14 @@ function updateStick(){
   const g=curGame(); const miss=p.filter(n=>g.scores[n].s===''||g.scores[n].s==null);
   document.getElementById('saveBtn').disabled=miss.length>0;
   document.getElementById('saveBtn').textContent=`儲存第 ${S.games.length+1} 局`;
-  document.getElementById('stickMsg').textContent=miss.length?`還差 ${miss.length} 人的分數`:'分數都填好了';
+  const TI=tempInfo(g,t), dd=TI.A.sum-TI.B.sum, any=TI.A.done||TI.B.done;
+  document.getElementById('stickMsg').innerHTML=(miss.length?`還差 ${miss.length} 人的分數`:'分數都填好了')+(any?`<br><b>${dd>0?'甲隊領先 '+dd+' 分':dd<0?'乙隊領先 '+(-dd)+' 分':'目前平手'}</b>`:'');
 }
 function refreshLive(){
   const g=curGame(),r=compute(g),p=present(),t=teamsOf();
   const mem=k=>p.filter(n=>t[n]===k).map(nm).join('、');
   const tb=document.getElementById('teamBox'); if(tb)tb.innerHTML=teamCards(r,mem);
+  const tx=document.getElementById('tempBox'); if(tx)tx.innerHTML=tempHtml(g,t);
   p.forEach(n=>{const a=document.querySelector(`[data-adj="${CSS.escape(n)}"]`);if(a)a.textContent=r.adj(n);
     const mo=document.querySelector(`[data-mon="${CSS.escape(n)}"]`);if(mo)mo.innerHTML=money(sumD(r.d[n]));
     const bg=document.querySelector(`[data-bingo="${CSS.escape(n)}"]`);if(bg)bg.classList.toggle('hide',!r.bingo[n]);});
